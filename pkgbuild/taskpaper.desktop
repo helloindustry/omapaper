@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=TaskPaper
+Comment=Plain-text task lists with projects, tags, and search
+Exec=taskpaper %f
+Icon=taskpaper
+Terminal=false
+Categories=Office;Utility;
+MimeType=text/plain;
+StartupWMClass=taskpaper
