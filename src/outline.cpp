@@ -20,10 +20,19 @@ QString Item::tagValue(const QString &name) const {
 
 Item parseLine(const QString &line) {
     Item item;
-    int i = 0;
-    while (i < line.size() && line[i] == '\t')
+    // Any leading whitespace is indentation, so tabs, spaces, and a mix of them all nest by how wide they are.
+    int i = 0, width = 0, tabs = 0;
+    while (i < line.size() && line[i].isSpace()) {
+        if (line[i] == '\t') {
+            width = (width / 4 + 1) * 4;
+            ++tabs;
+        } else {
+            ++width;
+        }
         ++i;
-    item.level = i;
+    }
+    item.level = tabs;
+    item.indent = width;
     item.bodyStart = i;
     if (line.mid(i).trimmed().isEmpty())
         return item;

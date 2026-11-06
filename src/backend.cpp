@@ -48,6 +48,7 @@ Backend::Backend(Theme *theme, const QString &initialFile, QObject *parent)
     m_noticeTimer.setInterval(3000);
     connect(&m_noticeTimer, &QTimer::timeout, this, [this] { m_notice.clear(); emit noticeChanged(); });
     connect(m_theme, &Theme::changed, this, &Backend::applyColors);
+    m_sidebarWidth = QSettings("taskpaper", "taskpaper").value("sidebarWidth", 240.0).toDouble();
     m_defaultFontSize = omarchyFontSize();
     m_fontDelta = QSettings("taskpaper", "taskpaper").value("fontDelta", 0.0).toDouble();
     m_fontSize = m_defaultFontSize + m_fontDelta;
@@ -172,7 +173,7 @@ bool Backend::renderPdf(const QString &path) const {
             html += "<div>&nbsp;</div>";
             continue;
         }
-        QString line = QString("&nbsp;").repeated(item.level * 2); // margin-left is ignored by Qt's rich text here
+        QString line = QString("&nbsp;").repeated(item.indent / 2); // margin-left is ignored by Qt's rich text here
         int pos = item.bodyStart;
         for (const auto &tag : item.tags) {
             line += text.mid(pos, tag.start - pos).toHtmlEscaped();
@@ -230,6 +231,96 @@ void Backend::print() {
         lp->deleteLater();
     });
     lp->start("lp", {"-t", title(), path});
+}
+
+QVariantList Backend::lineRange(int position) const {
+    const QTextBlock b = m_doc->findBlock(position);
+    return {b.position(), b.next().isValid() ? b.next().position() : b.position() + b.length() - 1};
+}
+
+void Backend::saveSidebarWidth() { QSettings("taskpaper", "taskpaper").setValue("sidebarWidth", m_sidebarWidth); }
+
+void Backend::toggleTagFold(const QString &name) {
+    if (!m_collapsedTags.remove(name))
+        m_collapsedTags.insert(name);
+    refresh();
+}
+
+// ---- several carets at once -------------------------------------------------------
+
+QVariantList Backend::extraCursors() const {
+    QVariantList positions;
+    for (const auto &c : m_extras)
+        positions << c.position();
+    return positions;
+}
+
+void Backend::addCursor(int position, int primary) {
+    if (!m_doc)
+        return;
+    QTextCursor c(m_doc);
+    c.setPosition(qBound(0, position, m_doc->characterCount() - 1));
+    m_extras.append(c);
+    QList<QTextCursor> all = allCursors(primary);
+    finishMulti(all);
+}
+
+void Backend::clearCursors() {
+    if (m_extras.isEmpty())
+        return;
+    m_extras.clear();
+    emit extraCursorsChanged();
+}
+
+QList<QTextCursor> Backend::allCursors(int primary) const {
+    QList<QTextCursor> all = m_extras;
+    QTextCursor p(m_doc);
+    p.setPosition(qBound(0, primary, m_doc->characterCount() - 1));
+    all.append(p); // the editor's own caret is always last
+    return all;
+}
+
+// Drops carets that landed on the same spot, keeps the rest as the extra carets, and returns the primary's position.
+int Backend::finishMulti(QList<QTextCursor> &all) {
+    const int primary = all.last().position();
+    QList<QTextCursor> keep;
+    QSet<int> seen{primary};
+    for (int i = 0; i < all.size() - 1; ++i)
+        if (!seen.contains(all[i].position())) {
+            seen.insert(all[i].position());
+            keep << all[i];
+        }
+    m_extras = keep;
+    emit extraCursorsChanged();
+    return primary;
+}
+
+int Backend::multiType(int primary, const QString &text) {
+    QList<QTextCursor> all = allCursors(primary);
+    all.first().beginEditBlock();
+    for (auto &c : all)
+        c.insertText(text);
+    all.first().endEditBlock();
+    return finishMulti(all);
+}
+
+int Backend::multiKey(int primary, int key) {
+    QList<QTextCursor> all = allCursors(primary);
+    all.first().beginEditBlock();
+    for (auto &c : all) {
+        switch (key) {
+        case Qt::Key_Backspace: c.deletePreviousChar(); break;
+        case Qt::Key_Delete: c.deleteChar(); break;
+        case Qt::Key_Left: c.movePosition(QTextCursor::PreviousCharacter); break;
+        case Qt::Key_Right: c.movePosition(QTextCursor::NextCharacter); break;
+        case Qt::Key_Up: c.movePosition(QTextCursor::Up); break;
+        case Qt::Key_Down: c.movePosition(QTextCursor::Down); break;
+        case Qt::Key_Home: c.movePosition(QTextCursor::StartOfBlock); break;
+        case Qt::Key_End: c.movePosition(QTextCursor::EndOfBlock); break;
+        }
+    }
+    all.first().endEditBlock();
+    return finishMulti(all);
 }
 
 void Backend::rememberCursor(int position) { m_cursor = position; }
@@ -316,10 +407,13 @@ void Backend::portalResponse(uint code, const QVariantMap &results) {
         openPath(QUrl(list.first()).toLocalFile());
 }
 
-void Backend::onChange(int position, int, int) {
+void Backend::onChange(int position, int removed, int added) {
     if (m_applying)
         return;
     m_dirty = true;
+    // One typed character: maybe it completes a tag the document already uses.
+    if (removed == 0 && added == 1 && m_extras.isEmpty())
+        QTimer::singleShot(0, this, [this, position] { suggestTag(position); });
     // The line being typed stays visible even if it doesn't match the search yet.
     m_pin = QTextCursor(m_doc->findBlock(position));
     m_refresh.start();
@@ -327,6 +421,40 @@ void Backend::onChange(int position, int, int) {
 }
 
 // ---- filtering, zooming, sidebar -------------------------------------------------
+
+// "@M" offers "@MIT" when a tag starting with M exists. The rest is added as selected text, so typing on
+// replaces it and Tab or Right accepts it. Nothing is offered after "@" alone, nor after a deletion.
+void Backend::suggestTag(int position) {
+    if (!m_doc || m_applying)
+        return;
+    const QTextBlock b = m_doc->findBlock(position);
+    const QString text = b.text();
+    const int col = position - b.position() + 1; // just after the typed character
+    if (col > text.size() || (col < text.size() && text[col].isLetterOrNumber()))
+        return; // only at the end of a word
+    static const QRegularExpression partial(R"((?<!\S)@([\w.\-]+)$)");
+    const auto m = partial.match(text.left(col));
+    if (!m.hasMatch())
+        return;
+    const QString prefix = m.captured(1);
+    QString best;
+    for (auto it = m_tagCounts.begin(); it != m_tagCounts.end(); ++it)
+        if (it.key().size() > prefix.size() && it.key().startsWith(prefix) // same case, so what you typed stays as typed
+            && (best.isEmpty() || it.value() > m_tagCounts.value(best)))
+            best = it.key();
+    if (best.isEmpty())
+        return;
+    const QString rest = best.mid(prefix.size());
+    QTextCursor c(m_doc);
+    c.setPosition(position + 1);
+    m_applying = true; // not a user edit: no autosave churn, no second suggestion
+    c.insertText(rest);
+    m_applying = false;
+    m_dirty = true;
+    m_save.start();
+    m_refresh.start();
+    emit suggestion(position + 1, position + 1 + rest.size());
+}
 
 void Backend::setQuery(const QString &query) {
     if (query == m_query)
@@ -346,7 +474,7 @@ void Backend::refresh() {
     const int n = items.size();
 
     // Parent and end of each item's subtree; blank lines belong to whatever surrounds them.
-    QVector<int> parent(n, -1), end(n, n), foldEnds(n, n), stack, strict;
+    QVector<int> parent(n, -1), end(n, n), stack;
     for (int i = 0; i < n; ++i) {
         if (items[i].type == Item::Blank)
             continue;
@@ -354,16 +482,12 @@ void Backend::refresh() {
             end[stack.takeLast()] = i;
         parent[i] = stack.isEmpty() ? -1 : stack.last();
         stack.append(i);
-        // Folding follows indentation only, so an item folds just the lines indented beneath it.
-        while (!strict.isEmpty() && items[strict.last()].level >= items[i].level)
-            foldEnds[strict.takeLast()] = i;
-        strict.append(i);
     }
 
     // The Searches project holds saved searches; it is not a project or a result.
     QVector<bool> inSearches(n, false);
     for (int i = 0; i < n; ++i)
-        if (items[i].type == Item::Project && items[i].level == 0 && items[i].title == "Searches")
+        if (items[i].type == Item::Project && items[i].indent == 0 && items[i].title == "Searches")
             for (int j = i; j < end[i]; ++j)
                 inSearches[j] = true;
 
@@ -388,13 +512,21 @@ void Backend::refresh() {
             visible[root] = true;
     }
     // A fold hides an item's children. Folds whose item lost its children are dropped.
-    // Only an item with something indented beneath it can fold, and gets an arrow.
+    // Folding follows indentation alone. An item folds every line indented deeper than it: text lines always,
+    // blank lines only if they are themselves indented, so spacing between sections stays visible.
+    // The region ends at the first text line that is not indented deeper.
+    auto foldRegionEnd = [&](int i) {
+        int j = i + 1;
+        while (j < n && (items[j].type == Item::Blank || items[j].indent > items[i].indent))
+            ++j;
+        return j;
+    };
     auto parent_has_children = [&](int i) {
         if (items[i].type == Item::Blank)
             return false;
-        for (int j = i + 1; j < foldEnds[i]; ++j)
+        for (int j = i + 1; j < n; ++j)
             if (items[j].type != Item::Blank)
-                return true;
+                return items[j].indent > items[i].indent;
         return false;
     };
     for (int f = m_folds.size() - 1; f >= 0; --f) {
@@ -403,8 +535,9 @@ void Backend::refresh() {
             m_folds.removeAt(f);
             continue;
         }
-        for (int j = b + 1; j < foldEnds[b]; ++j)
-            visible[j] = false;
+        for (int j = b + 1; j < foldRegionEnd(b); ++j)
+            if (items[j].type != Item::Blank || items[j].indent > items[b].indent)
+                visible[j] = false;
     }
     if (!m_pin.isNull() && m_pin.blockNumber() < n)
         visible[m_pin.blockNumber()] = true;
@@ -440,6 +573,7 @@ void Backend::refresh() {
 
     QVariantList projects, tags, searches;
     QMap<QString, QStringList> values;
+    QMap<QString, int> counts;
     for (int i = 0; i < n; ++i) {
         const Item &item = items[i];
         if (item.hasTag("search")) {
@@ -451,20 +585,26 @@ void Backend::refresh() {
         if (inSearches[i])
             continue;
         if (item.type == Item::Project)
-            projects << QVariantMap{{"kind", "project"}, {"label", item.title}, {"level", item.level}, {"block", i}};
+            projects << QVariantMap{{"kind", "project"}, {"label", item.title}, {"level", item.indent / 4}, {"block", i}};
         for (const auto &tag : item.tags) {
+            counts[tag.name]++;
             QStringList &list = values[tag.name];
             if (tag.hasValue && !tag.value.isEmpty() && !list.contains(tag.value))
                 list << tag.value;
         }
     }
-    // Each tag, and under it the distinct values it has been given.
+    m_tagCounts = counts;
+    // Each tag, and under it the distinct values it has been given; a tag with values can be collapsed.
     for (auto it = values.begin(); it != values.end(); ++it) {
-        tags << QVariantMap{{"kind", "tag"}, {"label", "@" + it.key()}, {"query", "@" + it.key()}, {"level", 0}};
         QStringList sorted = it.value();
         sorted.sort(Qt::CaseInsensitive);
+        const bool collapsed = m_collapsedTags.contains(it.key());
+        tags << QVariantMap{{"kind", "tag"}, {"label", "@" + it.key()}, {"name", it.key()}, {"query", "@" + it.key()},
+                            {"level", 0}, {"foldable", !sorted.isEmpty()}, {"collapsed", collapsed}};
+        if (collapsed)
+            continue;
         for (const auto &value : sorted)
-            tags << QVariantMap{{"kind", "tag"}, {"label", value}, {"level", 1},
+            tags << QVariantMap{{"kind", "tag"}, {"label", value}, {"level", 1}, {"foldable", false},
                                 {"query", "@" + it.key() + " = " + value}};
     }
 
@@ -482,6 +622,8 @@ void Backend::refresh() {
         emit sidebarChanged();
     }
     emit zoomChanged(); // the zoomed line may have been renamed
+    if (!m_extras.isEmpty())
+        emit extraCursorsChanged();
 }
 
 int Backend::parentBlock(int block) const {
@@ -535,17 +677,17 @@ bool Backend::hasChildren(int block) const {
     for (QTextBlock next = b.next(); next.isValid(); next = next.next()) {
         const Item other = parseLine(next.text());
         if (other.type != Item::Blank)
-            return other.level > item.level;
+            return other.indent > item.indent;
     }
     return false;
 }
 
 int Backend::foldEnd(int block) const {
-    const int level = parseLine(m_doc->findBlockByNumber(block).text()).level;
+    const int indent = parseLine(m_doc->findBlockByNumber(block).text()).indent;
     int i = block + 1;
     for (QTextBlock b = m_doc->findBlockByNumber(i); b.isValid(); b = b.next(), ++i) {
         const Item item = parseLine(b.text());
-        if (item.type != Item::Blank && item.level <= level)
+        if (item.type != Item::Blank && item.indent <= indent)
             break;
     }
     return i;
@@ -660,7 +802,7 @@ void Backend::saveSearch() {
     int at = -1;
     for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next()) {
         const Item item = parseLine(b.text());
-        if (item.type == Item::Project && item.level == 0 && item.title == "Searches") { at = b.blockNumber(); break; }
+        if (item.type == Item::Project && item.indent == 0 && item.title == "Searches") { at = b.blockNumber(); break; }
     }
     QTextCursor c(m_doc);
     c.beginEditBlock();
@@ -778,21 +920,40 @@ bool Backend::newline(int position) {
     const int column = position - b.position();
     if (item.type == Item::Blank || column < item.textStart)
         return false;
+    const QString lead = b.text().left(item.bodyStart); // the line's own indentation, tabs or spaces
     QTextCursor c(m_doc);
     c.beginEditBlock();
+    if (foldIndex(b.blockNumber()) >= 0 && column >= b.text().size()) {
+        // Enter at the end of a folded item: it stays folded, and the new line goes after everything hidden
+        // inside it, at the item's own level, which is the next line you would see.
+        int last = b.blockNumber();
+        for (int j = foldEnd(last) - 1; j > b.blockNumber(); --j) {
+            const Item inner = parseLine(m_doc->findBlockByNumber(j).text());
+            if (inner.type != Item::Blank || inner.indent > item.indent) {
+                last = j;
+                break;
+            }
+        }
+        const QTextBlock tail = m_doc->findBlockByNumber(last);
+        c.setPosition(tail.position() + tail.length() - 1);
+        c.insertText("\n" + lead + (item.type == Item::Task ? "- " : ""));
+        const int caret = c.position();
+        c.endEditBlock();
+        emit cursorRequested(caret);
+        return true;
+    }
     c.setPosition(position);
     if (item.type == Item::Task && item.title.isEmpty() && item.tags.isEmpty()) {
         // Enter on an empty task ends the list, and still adds the line the key asked for,
         // so repeated Enters keep making room instead of undoing the dash.
         c.setPosition(b.position() + item.bodyStart);
         c.setPosition(b.position() + b.length() - 1, QTextCursor::KeepAnchor);
-        c.insertText("\n" + QString(item.level, '\t'));
-    } else {
+        c.insertText("\n" + lead);
+    } else if (item.type == Item::Project) {
         // After a project the next thing typed is almost always its first task, one level in.
-        if (item.type == Item::Project)
-            c.insertText("\n" + QString(item.level + 1, '\t') + "- ");
-        else
-            c.insertText("\n" + QString(item.level, '\t') + (item.type == Item::Task ? "- " : ""));
+        c.insertText("\n" + lead + "\t- ");
+    } else {
+        c.insertText("\n" + lead + (item.type == Item::Task ? "- " : ""));
     }
     c.endEditBlock();
     return true;
@@ -858,7 +1019,7 @@ void Backend::archive(int start, int end) {
 
     int archiveBlock = -1, archiveEnd = -1;
     for (int i = 0; i < count && archiveBlock < 0; ++i)
-        if (items[i].type == Item::Project && items[i].level == 0 && items[i].title == "Archive") {
+        if (items[i].type == Item::Project && items[i].indent == 0 && items[i].title == "Archive") {
             archiveBlock = i;
             archiveEnd = subtreeEnd(i);
         }
@@ -926,7 +1087,7 @@ void Backend::archive(int start, int end) {
     int at = -1;
     for (QTextBlock b = m_doc->begin(); b.isValid() && at < 0; b = b.next()) {
         const Item item = parseLine(b.text());
-        if (item.type == Item::Project && item.level == 0 && item.title == "Archive")
+        if (item.type == Item::Project && item.indent == 0 && item.title == "Archive")
             at = b.blockNumber();
     }
     if (at < 0) {
@@ -946,14 +1107,14 @@ void Backend::archive(int start, int end) {
 void Backend::moveLines(int start, int end, int direction) {
     const auto range = blockRange(start, end);
     const int first = range.first, last = subtreeEnd(range.second); // [first, last)
-    const int level = parseLine(m_doc->findBlockByNumber(first).text()).level;
+    const int level = parseLine(m_doc->findBlockByNumber(first).text()).indent;
     int otherFirst, otherLast;
     if (direction < 0) {
         otherFirst = -1;
         for (int i = first - 1; i >= 0; --i) {
             const Item item = parseLine(m_doc->findBlockByNumber(i).text());
             if (item.type == Item::Blank) continue;
-            if (item.level == level) otherFirst = i;
+            if (item.indent == level) otherFirst = i;
             break;
         }
         if (otherFirst < 0) return;
@@ -961,7 +1122,7 @@ void Backend::moveLines(int start, int end, int direction) {
     } else {
         otherFirst = last;
         if (!m_doc->findBlockByNumber(otherFirst).isValid()
-            || parseLine(m_doc->findBlockByNumber(otherFirst).text()).level != level
+            || parseLine(m_doc->findBlockByNumber(otherFirst).text()).indent != level
             || parseLine(m_doc->findBlockByNumber(otherFirst).text()).type == Item::Blank)
             return;
         otherLast = subtreeEnd(otherFirst);

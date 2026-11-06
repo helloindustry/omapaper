@@ -45,6 +45,10 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+/ | Show all keys |
 | Ctrl+Q | Quit |
 
+Typing `@` and a letter offers a tag that is already in the document (`@M` suggests `@MIT`): Tab, Right, or Enter accepts it, and typing on replaces it.
+
+Ctrl+click adds more carets, and typing, Backspace, Delete, arrows, Enter and Tab then act at all of them (Esc or a plain click goes back to one). Triple-click selects a line; dragging from the third click extends by whole lines. Drag the edge of the sidebar to resize it, or drag it nearly shut to collapse it.
+
 Keys follow TaskPaper with Ctrl for Command and Alt for Option. Reopening a file puts the cursor back where you left it and restores which items were folded.
 
 Omarchy's single-key `?` and `Q` would type into a document, so help and quit take Ctrl.

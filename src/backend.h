@@ -3,6 +3,8 @@
 #include <QObject>
 #include <QQuickTextDocument>
 #include <QTextCursor>
+#include <QMap>
+#include <QSet>
 #include <QTimer>
 #include <QVariantList>
 
@@ -16,6 +18,8 @@ class Backend : public QObject {
     Q_PROPERTY(QString title READ title NOTIFY fileChanged)
     Q_PROPERTY(QString fontFamily READ fontFamily CONSTANT)
     Q_PROPERTY(double fontSize READ fontSize NOTIFY fontSizeChanged)
+    Q_PROPERTY(double sidebarWidth READ sidebarWidth WRITE setSidebarWidth NOTIFY sidebarWidthChanged)
+    Q_PROPERTY(QVariantList extraCursors READ extraCursors NOTIFY extraCursorsChanged)
     Q_PROPERTY(QString query READ query WRITE setQuery NOTIFY queryChanged)
     Q_PROPERTY(QVariantList sidebar READ sidebar NOTIFY sidebarChanged)
     Q_PROPERTY(QVariantList folds READ folds NOTIFY foldsChanged)
@@ -30,6 +34,9 @@ public:
     QString title() const;
     QString fontFamily() const;
     double fontSize() const { return m_fontSize; }
+    double sidebarWidth() const { return m_sidebarWidth; }
+    void setSidebarWidth(double width) { if (width != m_sidebarWidth) { m_sidebarWidth = width; emit sidebarWidthChanged(); } }
+    QVariantList extraCursors() const;
     QString query() const { return m_query; }
     void setQuery(const QString &query);
     QVariantList sidebar() const { return m_sidebar; }
@@ -45,6 +52,14 @@ public:
     Q_INVOKABLE void changeFontSize(double delta); // 0 resets to the default
     Q_INVOKABLE void openPath(const QString &path);
     Q_INVOKABLE void save();
+    Q_INVOKABLE void saveSidebarWidth();
+    Q_INVOKABLE QVariantList lineRange(int position) const; // [start, end) of the whole line, newline included
+    Q_INVOKABLE void toggleTagFold(const QString &name);
+    // More than one caret: Ctrl+click adds one, and typing then happens at every caret at once.
+    Q_INVOKABLE void addCursor(int position, int primary);
+    Q_INVOKABLE void clearCursors();
+    Q_INVOKABLE int multiType(int primary, const QString &text);
+    Q_INVOKABLE int multiKey(int primary, int key);
     Q_INVOKABLE void print(); // what is on screen, to the default printer
     bool renderPdf(const QString &path) const;
     Q_INVOKABLE void rememberCursor(int position); // reopened files put the caret back here
@@ -81,6 +96,9 @@ signals:
     void zoomChanged();
     void errorChanged();
     void noticeChanged();
+    void sidebarWidthChanged();
+    void extraCursorsChanged();
+    void suggestion(int start, int end); // select this range: the rest of a tag, offered as the user types it
     void moved(int start, int end);
     void foldsChanged();
     void cursorRequested(int position);
@@ -109,7 +127,13 @@ private:
     QTextDocument *m_doc = nullptr;
     Highlighter *m_highlighter = nullptr;
     QTextCursor m_zoom, m_pin; // cursors, so they follow the lines as text is edited
-    double m_fontSize = 10;
+    double m_fontSize = 10, m_sidebarWidth = 240;
+    QSet<QString> m_collapsedTags;
+    QMap<QString, int> m_tagCounts; // every tag in the document, for autofill
+    void suggestTag(int position);
+    QList<QTextCursor> m_extras;
+    QList<QTextCursor> allCursors(int primary) const;
+    int finishMulti(QList<QTextCursor> &all);
     int m_cursor = 0;
     double m_defaultFontSize = 9, m_fontDelta = 0;
     bool m_zoomed = false, m_applying = false, m_dirty = false;

@@ -21,6 +21,7 @@ ApplicationWindow {
     property bool sidebarVisible: true
     property bool helpVisible: false
     property bool findVisible: false
+    property bool searchOpen: false // the filter bar shows only while it is focused or a search is active
     property string findStatus: ""
 
     // A one-line text box used by the find panel.
@@ -61,6 +62,11 @@ ApplicationWindow {
                 color: theme.muted
             }
         }
+    }
+
+    Connections {
+        target: backend
+        function onQueryChanged() { if (backend.query === "" && !search.activeFocus) win.searchOpen = false }
     }
 
     function openFind() {
@@ -115,7 +121,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+F"; context: Qt.ApplicationShortcut; onActivated: win.findVisible ? win.closeFind() : win.openFind() }
     Shortcut { sequence: "Ctrl+G"; context: Qt.ApplicationShortcut; onActivated: win.findAgain(false) }
     Shortcut { sequence: "Ctrl+Shift+G"; context: Qt.ApplicationShortcut; onActivated: win.findAgain(true) }
-    Shortcut { sequence: "Ctrl+Shift+F"; context: Qt.ApplicationShortcut; onActivated: { search.forceActiveFocus(); search.selectAll() } }
+    Shortcut { sequence: "Ctrl+Shift+F"; context: Qt.ApplicationShortcut; onActivated: { win.searchOpen = true; search.forceActiveFocus(); search.selectAll() } }
     Shortcut { sequence: "Ctrl+Alt+F"; context: Qt.ApplicationShortcut; onActivated: backend.saveSearch() }
     Shortcut { sequences: ["Ctrl+Alt+S", "Ctrl+B"]; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
     Shortcut { sequences: ["Ctrl+D", "Ctrl+Return", "Ctrl+Enter"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
@@ -148,7 +154,7 @@ ApplicationWindow {
             // Projects, tags, and saved searches.
             Rectangle {
                 visible: win.sidebarVisible
-                Layout.preferredWidth: 240
+                Layout.preferredWidth: backend.sidebarWidth
                 Layout.fillHeight: true
                 color: theme.sidebar
 
@@ -182,7 +188,7 @@ ApplicationWindow {
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.verticalCenterOffset: row.header ? 6 : 0
-                            x: 16 + (row.modelData.level || 0) * 14
+                            x: (row.modelData.kind === "tag" ? 28 : 16) + (row.modelData.level || 0) * 14
                             width: parent.width - x - 16
                             text: row.modelData.label
                             elide: Text.ElideRight
@@ -190,6 +196,20 @@ ApplicationWindow {
                             font.pointSize: win.fs - (row.header ? 2 : 0.75)
                             font.bold: row.header
                             color: row.header ? theme.muted : theme.foreground
+                        }
+                        // Tags that have values fold, with the same arrow as the editor.
+                        Text {
+                            visible: row.modelData.foldable === true
+                            x: 4
+                            width: 24
+                            height: parent.height
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            text: row.modelData.collapsed ? "▸" : "▾"
+                            font.pointSize: win.fs + 6
+                            color: row.modelData.collapsed ? theme.accent : theme.muted
+                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                            TapHandler { onTapped: backend.toggleTagFold(row.modelData.name) }
                         }
                         HoverHandler { id: hover }
                         TapHandler {
@@ -214,6 +234,30 @@ ApplicationWindow {
                 }
             }
 
+            // Drag to resize the sidebar, drag it nearly shut to collapse it, double-click to toggle it.
+            Item {
+                Layout.preferredWidth: 6
+                Layout.fillHeight: true
+                Rectangle { anchors.horizontalCenter: parent.horizontalCenter; width: 1; height: parent.height; color: theme.selection; visible: win.sidebarVisible }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.SplitHCursor
+                    onPositionChanged: mouse => {
+                        if (!pressed)
+                            return
+                        const x = mapToItem(content, mouse.x, 0).x
+                        if (x < 100) {
+                            win.sidebarVisible = false
+                        } else {
+                            win.sidebarVisible = true
+                            backend.sidebarWidth = Math.max(140, Math.min(x, win.width * 0.6))
+                        }
+                    }
+                    onReleased: backend.saveSidebarWidth()
+                    onDoubleClicked: win.sidebarVisible = !win.sidebarVisible
+                }
+            }
+
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -221,6 +265,7 @@ ApplicationWindow {
 
                 // The search bar; typing filters the document as you go.
                 Rectangle {
+                    visible: win.searchOpen || backend.query !== ""
                     Layout.fillWidth: true
                     Layout.preferredHeight: Math.round(win.fs * 3.6)
                     color: theme.sidebar
@@ -238,7 +283,8 @@ ApplicationWindow {
                         clip: true
                         text: backend.query
                         onTextEdited: backend.query = text
-                        Keys.onEscapePressed: { backend.query = ""; editor.forceActiveFocus() }
+                        onActiveFocusChanged: if (!activeFocus && backend.query === "") win.searchOpen = false
+                        Keys.onEscapePressed: { backend.query = ""; win.searchOpen = false; editor.forceActiveFocus() }
                         Keys.onReturnPressed: editor.forceActiveFocus()
                         Text {
                             visible: !search.text && !search.activeFocus
@@ -292,10 +338,113 @@ ApplicationWindow {
                         // A property read, so the width follows the font size when it changes (a method call would not be re-evaluated).
                         tabStopDistance: fontMetrics.averageCharacterWidth * 2
                         persistentSelection: true
+                        selectByMouse: true
                         placeholderText: qsTr("Start typing. “- ” makes a task, a line ending in “:” makes a project, and “@tag” tags it.")
                         placeholderTextColor: theme.muted
-                        onCursorPositionChanged: backend.rememberCursor(cursorPosition)
+                        property int previousPos: 0
+                        property int currentPos: 0
+                        onCursorPositionChanged: { previousPos = currentPos; currentPos = cursorPosition; backend.rememberCursor(cursorPosition) }
                         Component.onCompleted: backend.attach(textDocument)
+
+                        // Several carets: Ctrl+click adds one (the old caret stays behind), and keys then act on all of them.
+                        property int ctrlBase: 0
+                        TapHandler {
+                            acceptedModifiers: Qt.ControlModifier
+                            onPressedChanged: if (pressed) editor.ctrlBase = editor.cursorPosition
+                            onTapped: eventPoint => {
+                                const clicked = editor.positionAt(eventPoint.position.x, eventPoint.position.y)
+                                // The caret that was there stays as an extra; the click becomes the main caret.
+                                const base = editor.ctrlBase === clicked ? editor.previousPos : editor.ctrlBase
+                                backend.addCursor(base, clicked)
+                                editor.cursorPosition = clicked
+                            }
+                        }
+                        Keys.onPressed: event => {
+                            if (event.key === Qt.Key_End && acceptSuggestion()) {
+                                event.accepted = true
+                                return
+                            }
+                            if (backend.extraCursors.length === 0)
+                                return
+                            const k = event.key
+                            const bare = !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
+                            let pos = -1
+                            if (k === Qt.Key_Escape) {
+                                backend.clearCursors()
+                                event.accepted = true
+                                return
+                            }
+                            if (!bare)
+                                return
+                            if ([Qt.Key_Backspace, Qt.Key_Delete, Qt.Key_Left, Qt.Key_Right, Qt.Key_Up, Qt.Key_Down, Qt.Key_Home, Qt.Key_End].indexOf(k) >= 0) {
+                                if (event.modifiers & Qt.ShiftModifier) { backend.clearCursors(); return } // selecting is single-caret
+                                pos = backend.multiKey(editor.cursorPosition, k)
+                            } else if (k === Qt.Key_Return || k === Qt.Key_Enter) {
+                                pos = backend.multiType(editor.cursorPosition, "\n")
+                            } else if (k === Qt.Key_Tab) {
+                                pos = backend.multiType(editor.cursorPosition, "\t")
+                            } else if (event.text.length > 0 && event.text.charCodeAt(0) >= 32) {
+                                pos = backend.multiType(editor.cursorPosition, event.text)
+                            }
+                            if (pos >= 0) {
+                                editor.cursorPosition = pos
+                                event.accepted = true
+                            }
+                        }
+                        Repeater {
+                            model: backend.extraCursors
+                            delegate: Rectangle {
+                                required property var modelData
+                                readonly property rect line: { editor.contentHeight; editor.width; return editor.positionToRectangle(modelData) }
+                                x: line.x
+                                y: line.y
+                                width: 2
+                                height: line.height
+                                color: theme.accent
+                                SequentialAnimation on opacity {
+                                    loops: Animation.Infinite
+                                    NumberAnimation { to: 0; duration: 530 }
+                                    NumberAnimation { to: 1; duration: 530 }
+                                }
+                            }
+                        }
+
+                        // Triple-click selects the whole line, and dragging from that third press extends by whole lines.
+                        property var lineAnchor: null
+                        property int clickCount: 0
+                        property double lastPress: 0
+                        property point lastPoint
+                        PointHandler {
+                            acceptedButtons: Qt.LeftButton
+                            acceptedModifiers: Qt.NoModifier
+                            onActiveChanged: {
+                                if (active) {
+                                    const now = Date.now()
+                                    const p = point.position
+                                    const near = Math.abs(p.x - editor.lastPoint.x) < 6 && Math.abs(p.y - editor.lastPoint.y) < 6
+                                    editor.clickCount = (now - editor.lastPress < Qt.styleHints.mouseDoubleClickInterval && near) ? editor.clickCount + 1 : 1
+                                    editor.lastPress = now
+                                    editor.lastPoint = p
+                                    if (editor.clickCount === 3) {
+                                        const r = backend.lineRange(editor.positionAt(p.x, p.y))
+                                        editor.lineAnchor = r
+                                        editor.selectByMouse = false // so the editor's own drag selection does not fight this one
+                                        editor.select(r[0], r[1])
+                                    }
+                                } else {
+                                    editor.lineAnchor = null
+                                    editor.selectByMouse = true
+                                }
+                            }
+                            onPointChanged: {
+                                if (!active || editor.lineAnchor === null)
+                                    return
+                                const r = backend.lineRange(editor.positionAt(point.position.x, point.position.y))
+                                const a = editor.lineAnchor
+                                if (r[0] < a[0]) editor.select(a[1], r[0])
+                                else editor.select(a[0], Math.max(a[1], r[1]))
+                            }
+                        }
 
                         // Links open on a click and show a pointing hand, as in TaskPaper.
                         property bool overLink: false
@@ -304,7 +453,9 @@ ApplicationWindow {
                         }
                         HoverHandler { enabled: editor.overLink; cursorShape: Qt.PointingHandCursor }
                         TapHandler {
+                            acceptedModifiers: Qt.NoModifier
                             onTapped: eventPoint => {
+                                backend.clearCursors()
                                 const url = backend.linkAt(editor.positionAt(eventPoint.position.x, eventPoint.position.y))
                                 if (url !== "") Qt.openUrlExternally(url)
                             }
@@ -314,9 +465,31 @@ ApplicationWindow {
 
                         // A Keys handler accepts the key unless told otherwise, so say so when the default Return should run.
                         Keys.onReturnPressed: event => {
+                            if (acceptSuggestion()) { event.accepted = true; return }
                             event.accepted = editor.selectionStart === editor.selectionEnd && backend.newline(editor.cursorPosition)
                         }
-                        Keys.onTabPressed: event => { backend.indent(editor.selectionStart, editor.selectionEnd, 1); event.accepted = true }
+                        // A tag suggestion sits after the caret as selected text; Tab, Right, End, or Enter keep it.
+                        property int suggestStart: -1
+                        property int suggestEnd: -1
+                        function acceptSuggestion() {
+                            if (suggestEnd < 0 || selectionStart !== suggestStart || selectionEnd !== suggestEnd)
+                                return false
+                            const end = suggestEnd
+                            suggestStart = suggestEnd = -1
+                            deselect()
+                            cursorPosition = end
+                            return true
+                        }
+                        Connections {
+                            target: backend
+                            function onSuggestion(start, end) {
+                                editor.suggestStart = start
+                                editor.suggestEnd = end
+                                editor.select(start, end)
+                            }
+                        }
+                        Keys.onRightPressed: event => { if (acceptSuggestion()) event.accepted = true; else event.accepted = false }
+                        Keys.onTabPressed: event => { if (!acceptSuggestion()) backend.indent(editor.selectionStart, editor.selectionEnd, 1); event.accepted = true }
                         Keys.onBacktabPressed: event => { backend.indent(editor.selectionStart, editor.selectionEnd, -1); event.accepted = true }
 
                         // Disclosure triangles in the left margin, one per item that has children.

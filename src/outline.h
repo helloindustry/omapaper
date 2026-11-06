@@ -16,6 +16,7 @@ struct Item {
 
     Type type = Blank;
     int level = 0;     // leading tabs
+    int indent = 0;    // width of all leading whitespace (a tab is 4 columns); this alone decides nesting
     int bodyStart = 0; // first character after the tabs
     int textStart = 0; // first character after "- " for tasks
     QString title;     // the item's words, without tags or a project's colon
@@ -39,8 +40,8 @@ QList<Link> findLinks(const QString &line);
 // tasks and notes that follow it at its own level, so a list typed without
 // indenting still folds, zooms, and filters as one project until the next project.
 inline bool endsSubtree(const Item &root, const Item &next) {
-    if (next.level != root.level)
-        return next.level < root.level;
+    if (next.indent != root.indent)
+        return next.indent < root.indent;
     return !(root.type == Item::Project && next.type != Item::Project);
 }
 
