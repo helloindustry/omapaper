@@ -1022,6 +1022,28 @@ void Backend::toggleDone(int start, int end) {
     c.endEditBlock();
 }
 
+// Deletes whole lines. A folded item takes its hidden contents with it, since they can't be seen to be kept.
+void Backend::deleteLines(int start, int end) {
+    if (!m_doc)
+        return;
+    const auto range = blockRange(start, end);
+    int last = range.second;
+    for (int i = range.first; i <= range.second; ++i)
+        if (foldIndex(i) >= 0)
+            last = qMax(last, foldEnd(i) - 1);
+    const QTextBlock from = m_doc->findBlockByNumber(range.first), to = m_doc->findBlockByNumber(last);
+    QTextCursor c(m_doc);
+    if (to.next().isValid()) {
+        c.setPosition(from.position());
+        c.setPosition(to.next().position(), QTextCursor::KeepAnchor);
+    } else {
+        // The last line has no newline after it, so take the one before it.
+        c.setPosition(from.position() > 0 ? from.position() - 1 : 0);
+        c.setPosition(to.position() + to.length() - 1, QTextCursor::KeepAnchor);
+    }
+    c.removeSelectedText();
+}
+
 // Moves items under an "Archive:" project at the bottom of the file, the way TaskPaper does: they go in at
 // the top of the project, keep their children, tags and @done, and gain @project(Parent / Child) naming
 // where they came from. With nothing selected it archives every @done item, as TaskPaper's command does.

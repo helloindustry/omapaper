@@ -141,6 +141,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Alt+F"; context: Qt.ApplicationShortcut; onActivated: backend.saveSearch() }
     Shortcut { sequences: ["Ctrl+Alt+S", "Ctrl+B"]; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
     Shortcut { sequences: ["Ctrl+D", "Ctrl+Return", "Ctrl+Enter"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
+    Shortcut { sequence: "Ctrl+Shift+K"; context: Qt.ApplicationShortcut; onActivated: backend.deleteLines(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false) }
     Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(0) }
@@ -662,6 +663,7 @@ ApplicationWindow {
                     model: [
                         [qsTr("Toggle done"), "Ctrl+D"],
                         [qsTr("Archive done items / selection"), "Ctrl+Shift+A"],
+                        [qsTr("Delete line"), "Ctrl+Shift+K"],
                         [qsTr("Collapse item (Ctrl+. toggles)"), "Ctrl+9"],
                         [qsTr("Collapse / expand completely"), "Ctrl+Alt+9 / 0"],
                         [qsTr("Collapse / expand all"), "Ctrl+Shift+9 / 0"],
