@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QProcess>
 #include <QRandomGenerator>
 #include <QSaveFile>
 #include <QSettings>
@@ -26,9 +27,33 @@ Backend::Backend(Theme *theme, const QString &initialFile, QObject *parent)
     m_save.setInterval(800);
     connect(&m_save, &QTimer::timeout, this, &Backend::save);
     connect(m_theme, &Theme::changed, this, &Backend::applyColors);
+    // One point under the first release's size, which read slightly large.
+    m_fontSize = QSettings("taskpaper", "taskpaper").value("fontSize", 10.0).toDouble();
 }
 
-QString Backend::fontFamily() const { return QFontDatabase::systemFont(QFontDatabase::FixedFont).family(); }
+// The font Omarchy has picked for monospace (iA Writer Mono S by default); fontconfig is where Omarchy sets it.
+QString Backend::fontFamily() const {
+    static const QString family = [] {
+        QProcess fc;
+        fc.start("fc-match", {"-f", "%{family}", "monospace"});
+        if (fc.waitForFinished(500) && fc.exitCode() == 0) {
+            const QString name = QString::fromUtf8(fc.readAllStandardOutput()).section(',', 0, 0).trimmed();
+            if (!name.isEmpty())
+                return name;
+        }
+        return QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
+    }();
+    return family;
+}
+
+void Backend::changeFontSize(double delta) {
+    const double size = delta == 0 ? 10.0 : qBound(6.0, m_fontSize + delta, 32.0);
+    if (size == m_fontSize)
+        return;
+    m_fontSize = size;
+    QSettings("taskpaper", "taskpaper").setValue("fontSize", size);
+    emit fontSizeChanged();
+}
 QString Backend::title() const { return m_path.isEmpty() ? tr("Untitled") : QFileInfo(m_path).fileName(); }
 
 void Backend::applyColors() {
@@ -115,6 +140,35 @@ void Backend::openDialog() {
                                                "org.freedesktop.portal.FileChooser", "OpenFile");
     call << QString() << tr("Open") << QVariantMap{{"handle_token", token}};
     bus.asyncCall(call);
+}
+
+// Save As is the desktop's own dialog too; the document then continues in the new file.
+void Backend::saveAsDialog() {
+    auto bus = QDBusConnection::sessionBus();
+    const QString token = "taskpaper" + QString::number(QRandomGenerator::global()->generate());
+    const QString path = "/org/freedesktop/portal/desktop/request/" + bus.baseService().mid(1).replace('.', '_') + "/" + token;
+    bus.connect({}, path, "org.freedesktop.portal.Request", "Response", this, SLOT(saveAsResponse(uint, QVariantMap)));
+    auto call = QDBusMessage::createMethodCall("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+                                               "org.freedesktop.portal.FileChooser", "SaveFile");
+    call << QString() << tr("Save As") << QVariantMap{{"handle_token", token}, {"current_name", title().endsWith(".taskpaper") || title().endsWith(".txt") ? title() : "Tasks.taskpaper"}};
+    bus.asyncCall(call);
+}
+
+void Backend::saveAsResponse(uint code, const QVariantMap &results) {
+    if (code != 0 || !m_doc)
+        return;
+    QVariant uris = results.value("uris");
+    QStringList list = uris.canConvert<QDBusArgument>() ? qdbus_cast<QStringList>(uris.value<QDBusArgument>())
+                                                        : uris.toStringList();
+    if (list.isEmpty())
+        return;
+    save(); // finish the old file first
+    m_path = QUrl(list.first()).toLocalFile();
+    QSettings("taskpaper", "taskpaper").setValue("lastFile", m_path);
+    QFile(m_path).open(QIODevice::WriteOnly | QIODevice::Append); // creates it, so an empty document still gets a file
+    m_dirty = true;
+    save();
+    emit fileChanged();
 }
 
 void Backend::portalResponse(uint code, const QVariantMap &results) {

@@ -17,23 +17,28 @@ ApplicationWindow {
     Material.accent: theme.accent
     Material.roundedScale: theme.radius
 
+    readonly property real fs: backend.fontSize // the size everything else scales from
     property bool sidebarVisible: true
     property bool helpVisible: false
 
     // Keys follow TaskPaper with Ctrl in place of Command. Omarchy owns Super, so nothing here uses it,
     // and the single-letter keys of Omarchy's own apps (Q, ?) would type into the document, so they are Ctrl+Q and Ctrl+/.
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
-    Shortcut { sequences: ["Ctrl+/", "F1"]; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
+    Shortcut { sequences: ["Ctrl+K", "Ctrl+/", "F1"]; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
+    Shortcut { sequence: "Ctrl+Shift+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveAsDialog() }
+    Shortcut { sequences: ["Ctrl+=", "Ctrl++"]; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(1) }
+    Shortcut { sequence: "Ctrl+-"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(-1) }
+    Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(0) }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
     Shortcut { sequence: "Ctrl+F"; context: Qt.ApplicationShortcut; onActivated: { search.forceActiveFocus(); search.selectAll() } }
     Shortcut { sequence: "Ctrl+Shift+F"; context: Qt.ApplicationShortcut; onActivated: backend.saveSearch() }
     Shortcut { sequence: "Ctrl+Alt+S"; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
-    Shortcut { sequence: "Ctrl+D"; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
+    Shortcut { sequences: ["Ctrl+Return", "Ctrl+Enter", "Ctrl+D"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Alt+Right"; context: Qt.ApplicationShortcut; onActivated: backend.zoomIn(editor.cursorPosition) }
     Shortcut { sequence: "Ctrl+Alt+Left"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
     Shortcut { sequence: "Ctrl+Alt+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
     Shortcut { sequence: "Ctrl+Alt+Down"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, 1) }
-    Shortcut { sequence: "Ctrl+Return"; context: Qt.ApplicationShortcut; onActivated: backend.toggleFold(editor.cursorPosition) }
+    Shortcut { sequences: ["Ctrl+.", "Ctrl+Alt+Return"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleFold(editor.cursorPosition) }
     Shortcut { sequence: "Ctrl+Alt+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(true) }
     Shortcut { sequence: "Ctrl+Alt+0"; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(false) }
     Shortcut { sequence: "Ctrl+Alt+Home"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
@@ -74,7 +79,7 @@ ApplicationWindow {
                                                        : modelData.kind === "header" ? false
                                                        : backend.zoomBlock < 0 && backend.query === modelData.query
                         width: ListView.view.width
-                        height: header ? 36 : 26
+                        height: Math.round(win.fs * (header ? 3.6 : 2.6))
 
                         Rectangle {
                             anchors.fill: parent
@@ -91,7 +96,7 @@ ApplicationWindow {
                             text: row.modelData.label
                             elide: Text.ElideRight
                             font.family: backend.fontFamily
-                            font.pixelSize: row.header ? 12 : 14
+                            font.pointSize: win.fs - (row.header ? 2 : 0.75)
                             font.bold: row.header
                             color: row.header ? theme.muted : theme.foreground
                         }
@@ -126,7 +131,7 @@ ApplicationWindow {
                 // The search bar; typing filters the document as you go.
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 36
+                    Layout.preferredHeight: Math.round(win.fs * 3.6)
                     color: theme.sidebar
                     TextInput {
                         id: search
@@ -135,7 +140,7 @@ ApplicationWindow {
                         anchors.rightMargin: 16
                         verticalAlignment: TextInput.AlignVCenter
                         font.family: backend.fontFamily
-                        font.pixelSize: 14
+                        font.pointSize: win.fs - 0.75
                         color: theme.foreground
                         selectionColor: theme.accent
                         selectedTextColor: theme.accentForeground
@@ -158,7 +163,7 @@ ApplicationWindow {
                 Rectangle {
                     visible: backend.zoomBlock >= 0
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 28
+                    Layout.preferredHeight: Math.round(win.fs * 2.8)
                     color: theme.sidebar
                     Text {
                         anchors.fill: parent
@@ -168,7 +173,7 @@ ApplicationWindow {
                         elide: Text.ElideLeft
                         text: backend.zoomPath
                         font.family: backend.fontFamily
-                        font.pixelSize: 13
+                        font.pointSize: win.fs - 1.5
                         color: theme.muted
                     }
                     TapHandler { onTapped: backend.zoomOut() }
@@ -185,11 +190,11 @@ ApplicationWindow {
                         background: null
                         wrapMode: TextEdit.Wrap
                         font.family: backend.fontFamily
-                        font.pixelSize: 15
+                        font.pointSize: win.fs
                         color: theme.foreground
                         selectionColor: theme.accent
                         selectedTextColor: theme.accentForeground
-                        leftPadding: 24
+                        leftPadding: 32
                         rightPadding: 24
                         topPadding: 16
                         bottomPadding: 16
@@ -227,13 +232,16 @@ ApplicationWindow {
                             delegate: Text {
                                 required property var modelData
                                 readonly property rect line: { editor.contentHeight; editor.width; return editor.positionToRectangle(modelData.pos) }
-                                x: 6
+                                x: 4
                                 y: line.y
+                                width: 24
                                 height: line.height
+                                horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 text: modelData.folded ? "▸" : "▾"
-                                font.pixelSize: 15
+                                font.pointSize: win.fs + 6
                                 color: modelData.folded ? theme.accent : theme.muted
+                                HoverHandler { cursorShape: Qt.PointingHandCursor }
                                 TapHandler { onTapped: backend.toggleFoldBlock(modelData.block) }
                             }
                         }
@@ -249,7 +257,7 @@ ApplicationWindow {
                 Rectangle {
                     visible: backend.error !== ""
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 28
+                    Layout.preferredHeight: Math.round(win.fs * 2.8)
                     color: theme.sidebar
                     Text {
                         anchors.fill: parent
@@ -257,7 +265,7 @@ ApplicationWindow {
                         verticalAlignment: Text.AlignVCenter
                         text: backend.error
                         font.family: backend.fontFamily
-                        font.pixelSize: 13
+                        font.pointSize: win.fs - 1.5
                         color: "#ff5f4a"
                     }
                 }
@@ -280,29 +288,31 @@ ApplicationWindow {
                 rowSpacing: 6
                 Repeater {
                     model: [
-                        [qsTr("Toggle done"), "Ctrl+D"],
+                        [qsTr("Toggle done"), "Ctrl+Enter / Ctrl+D"],
+                        [qsTr("Fold / unfold"), "Ctrl+."],
+                        [qsTr("Fold all / unfold all"), "Ctrl+Alt+9 / 0"],
                         [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
                         [qsTr("Move up / down"), "Ctrl+Alt+Up / Down"],
                         [qsTr("Zoom in / out"), "Ctrl+Alt+Right / Left"],
                         [qsTr("Home (whole document)"), "Ctrl+Alt+Home"],
-                        [qsTr("Fold / unfold"), "Ctrl+Return"],
-                        [qsTr("Fold all / unfold all"), "Ctrl+Alt+9 / 0"],
                         [qsTr("Search"), "Ctrl+F"],
                         [qsTr("Save search"), "Ctrl+Shift+F"],
                         [qsTr("Toggle sidebar"), "Ctrl+Alt+S"],
+                        [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
                         [qsTr("Open"), "Ctrl+O"],
+                        [qsTr("Save As"), "Ctrl+Shift+S"],
                         [qsTr("Undo / redo"), "Ctrl+Z / Ctrl+Shift+Z"],
-                        [qsTr("This help"), "Ctrl+/ or F1"],
+                        [qsTr("This list"), "Ctrl+K"],
                         [qsTr("Quit"), "Ctrl+Q"]
                     ]
                     delegate: Item {
                         required property var modelData
                         required property int index
                         Layout.columnSpan: 2
-                        Layout.preferredWidth: 460
-                        Layout.preferredHeight: 22
-                        Text { text: modelData[0]; color: theme.foreground; font.family: backend.fontFamily; font.pixelSize: 14 }
-                        Text { anchors.right: parent.right; text: modelData[1]; color: theme.muted; font.family: backend.fontFamily; font.pixelSize: 14 }
+                        Layout.preferredWidth: 520
+                        Layout.preferredHeight: Math.round(win.fs * 2.2)
+                        Text { text: modelData[0]; color: theme.foreground; font.family: backend.fontFamily; font.pointSize: win.fs - 0.75 }
+                        Text { anchors.right: parent.right; text: modelData[1]; color: theme.muted; font.family: backend.fontFamily; font.pointSize: win.fs - 0.75 }
                     }
                 }
             }

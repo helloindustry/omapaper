@@ -15,6 +15,7 @@ class Backend : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString title READ title NOTIFY fileChanged)
     Q_PROPERTY(QString fontFamily READ fontFamily CONSTANT)
+    Q_PROPERTY(double fontSize READ fontSize NOTIFY fontSizeChanged)
     Q_PROPERTY(QString query READ query WRITE setQuery NOTIFY queryChanged)
     Q_PROPERTY(QVariantList sidebar READ sidebar NOTIFY sidebarChanged)
     Q_PROPERTY(QVariantList folds READ folds NOTIFY foldsChanged)
@@ -27,6 +28,7 @@ public:
 
     QString title() const;
     QString fontFamily() const;
+    double fontSize() const { return m_fontSize; }
     QString query() const { return m_query; }
     void setQuery(const QString &query);
     QVariantList sidebar() const { return m_sidebar; }
@@ -37,6 +39,8 @@ public:
 
     Q_INVOKABLE void attach(QQuickTextDocument *document);
     Q_INVOKABLE void openDialog();
+    Q_INVOKABLE void saveAsDialog();
+    Q_INVOKABLE void changeFontSize(double delta); // 0 resets to the default
     Q_INVOKABLE void openPath(const QString &path);
     Q_INVOKABLE void save();
 
@@ -60,6 +64,7 @@ public:
 
 signals:
     void fileChanged();
+    void fontSizeChanged();
     void queryChanged();
     void sidebarChanged();
     void zoomChanged();
@@ -70,6 +75,7 @@ signals:
 
 private slots:
     void portalResponse(uint code, const QVariantMap &results);
+    void saveAsResponse(uint code, const QVariantMap &results);
 
 private:
     void load(const QString &path);
@@ -89,6 +95,7 @@ private:
     QTextDocument *m_doc = nullptr;
     Highlighter *m_highlighter = nullptr;
     QTextCursor m_zoom, m_pin; // cursors, so they follow the lines as text is edited
+    double m_fontSize = 10;
     bool m_zoomed = false, m_applying = false, m_dirty = false;
     QVariantList m_sidebar, m_foldMarks;
     QList<QTextCursor> m_folds; // fold points, as cursors so they follow the lines when text is edited

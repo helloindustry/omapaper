@@ -25,18 +25,21 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 
 | Key | Action |
 | --- | --- |
-| Ctrl+D | Toggle done (adds `@done(today)`) |
+| Ctrl+Enter or Ctrl+D | Toggle done (adds `@done(today)`) |
+| Ctrl+. | Fold / unfold the item |
+| Ctrl+Alt+9 / Ctrl+Alt+0 | Fold all / unfold all |
 | Tab / Shift+Tab | Indent / outdent |
 | Ctrl+Alt+Up / Down | Move item with its children |
 | Ctrl+Alt+Right / Left | Zoom in / out |
-| Ctrl+Alt+Home | Home: the whole document (clears zoom and search) |
-| Ctrl+Return | Fold / unfold the item |
-| Ctrl+Alt+9 / Ctrl+Alt+0 | Fold all / unfold all |
+| Ctrl+Alt+Home | Home: the whole document |
 | Ctrl+F | Search |
 | Ctrl+Shift+F | Save current search |
 | Ctrl+Alt+S | Toggle sidebar |
-| Ctrl+O | Open file |
-| Ctrl+/ or F1 | Show all keys |
+| Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text |
+| Ctrl+O / Ctrl+Shift+S | Open / Save As |
+| Ctrl+K | Show all keys |
 | Ctrl+Q | Quit |
 
 Omarchy's single-key `?` and `Q` would type into a document, so help and quit take Ctrl.
+
+Text is Omarchy's monospace font (iA Writer Mono S by default) at 10pt.
