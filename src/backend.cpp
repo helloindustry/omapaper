@@ -795,7 +795,8 @@ void Backend::indent(int start, int end, int direction) {
         const QTextBlock b = m_doc->findBlockByNumber(i);
         c.setPosition(b.position());
         if (direction > 0) {
-            if (!b.text().isEmpty())
+            // A lone empty line can be indented before anything is typed; blank lines inside a selection stay blank.
+            if (!b.text().isEmpty() || range.first == range.second)
                 c.insertText("\t");
         } else if (b.text().startsWith('\t')) {
             c.deleteChar();
