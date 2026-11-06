@@ -27,6 +27,16 @@ struct Item {
 
 Item parseLine(const QString &line);
 
+// Whether `next` (a non-blank item after `root`) falls outside root's children.
+// Children are normally the deeper-indented lines. A project also keeps the plain
+// tasks and notes that follow it at its own level, so a list typed without
+// indenting still folds, zooms, and filters as one project until the next project.
+inline bool endsSubtree(const Item &root, const Item &next) {
+    if (next.level != root.level)
+        return next.level < root.level;
+    return !(root.type == Item::Project && next.type != Item::Project);
+}
+
 // A search such as `@due < today and not @done`, `project Inbox`, or `milk or eggs`.
 class Query {
 public:

@@ -180,6 +180,7 @@ ApplicationWindow {
 
                     TextArea {
                         id: editor
+                        objectName: "editor"
                         focus: true
                         background: null
                         wrapMode: TextEdit.Wrap
@@ -200,9 +201,9 @@ ApplicationWindow {
 
                         FontMetrics { id: fontMetrics; font: editor.font }
 
+                        // A Keys handler accepts the key unless told otherwise, so say so when the default Return should run.
                         Keys.onReturnPressed: event => {
-                            if (editor.selectionStart === editor.selectionEnd && backend.newline(editor.cursorPosition))
-                                event.accepted = true
+                            event.accepted = editor.selectionStart === editor.selectionEnd && backend.newline(editor.cursorPosition)
                         }
                         Keys.onTabPressed: event => { backend.indent(editor.selectionStart, editor.selectionEnd, 1); event.accepted = true }
                         Keys.onBacktabPressed: event => { backend.indent(editor.selectionStart, editor.selectionEnd, -1); event.accepted = true }
@@ -226,7 +227,7 @@ ApplicationWindow {
 
                         Connections {
                             target: backend
-                            function onCursorRequested(position) { editor.cursorPosition = position }
+                            function onCursorRequested(position) { editor.forceActiveFocus(); editor.cursorPosition = position }
                             function onMoved(start, end) { editor.select(start, end) }
                         }
                     }
@@ -270,7 +271,7 @@ ApplicationWindow {
                         [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
                         [qsTr("Move up / down"), "Ctrl+Alt+Up / Down"],
                         [qsTr("Zoom in / out"), "Ctrl+Alt+Right / Left"],
-                        [qsTr("Show all"), "Ctrl+Alt+Home"],
+                        [qsTr("Home (whole document)"), "Ctrl+Alt+Home"],
                         [qsTr("Fold / unfold"), "Ctrl+Return"],
                         [qsTr("Fold all / unfold all"), "Ctrl+Alt+9 / 0"],
                         [qsTr("Search"), "Ctrl+F"],

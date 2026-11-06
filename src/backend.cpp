@@ -161,7 +161,7 @@ void Backend::refresh() {
     for (int i = 0; i < n; ++i) {
         if (items[i].type == Item::Blank)
             continue;
-        while (!stack.isEmpty() && items[stack.last()].level >= items[i].level)
+        while (!stack.isEmpty() && endsSubtree(items[stack.last()], items[i]))
             end[stack.takeLast()] = i;
         parent[i] = stack.isEmpty() ? -1 : stack.last();
         stack.append(i);
@@ -277,7 +277,7 @@ void Backend::refresh() {
     }
 
     QVariantList sidebar;
-    sidebar << QVariantMap{{"kind", "all"}, {"label", tr("All")}};
+    sidebar << QVariantMap{{"kind", "all"}, {"label", tr("Home")}};
     auto section = [&](const QString &name, const QVariantList &rows) {
         if (!rows.isEmpty())
             sidebar << QVariantMap{{"kind", "header"}, {"label", name}} << rows;
@@ -293,10 +293,10 @@ void Backend::refresh() {
 }
 
 int Backend::parentBlock(int block) const {
-    const int level = parseLine(m_doc->findBlockByNumber(block).text()).level;
+    const Item item = parseLine(m_doc->findBlockByNumber(block).text());
     for (QTextBlock b = m_doc->findBlockByNumber(block).previous(); b.isValid(); b = b.previous()) {
-        const Item item = parseLine(b.text());
-        if (item.type != Item::Blank && item.level < level)
+        const Item other = parseLine(b.text());
+        if (other.type != Item::Blank && !endsSubtree(other, item))
             return b.blockNumber();
     }
     return -1;
@@ -317,6 +317,12 @@ void Backend::search(const QString &query) {
     m_pin = QTextCursor();
     emit queryChanged();
     refresh();
+    // The caret may be on a line that just disappeared; put it on the first one still showing.
+    for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next())
+        if (b.isVisible()) {
+            emit cursorRequested(b.position() + b.length() - 1);
+            break;
+        }
 }
 
 void Backend::showProject(int block) {
@@ -337,7 +343,7 @@ bool Backend::hasChildren(int block) const {
     for (QTextBlock next = b.next(); next.isValid(); next = next.next()) {
         const Item other = parseLine(next.text());
         if (other.type != Item::Blank)
-            return other.level > item.level;
+            return !endsSubtree(item, other);
     }
     return false;
 }
@@ -383,6 +389,8 @@ void Backend::zoomToBlock(int block) {
     m_zoomed = true;
     m_pin = QTextCursor();
     refresh();
+    const QTextBlock root = m_doc->findBlockByNumber(block);
+    emit cursorRequested(root.position() + root.length() - 1);
 }
 
 void Backend::zoomIn(int position) {
@@ -455,11 +463,11 @@ QPair<int, int> Backend::blockRange(int start, int end) const {
 }
 
 int Backend::subtreeEnd(int block) const {
-    const int level = parseLine(m_doc->findBlockByNumber(block).text()).level;
+    const Item root = parseLine(m_doc->findBlockByNumber(block).text());
     int i = block + 1;
     for (QTextBlock b = m_doc->findBlockByNumber(i); b.isValid(); b = b.next(), ++i) {
         const Item item = parseLine(b.text());
-        if (item.type != Item::Blank && item.level <= level)
+        if (item.type != Item::Blank && endsSubtree(root, item))
             break;
     }
     return i;
@@ -482,7 +490,11 @@ bool Backend::newline(int position) {
         c.setPosition(b.position() + b.length() - 1, QTextCursor::KeepAnchor);
         c.insertText("\n" + QString(item.level, '\t'));
     } else {
-        c.insertText("\n" + QString(item.level, '\t') + (item.type == Item::Task ? "- " : ""));
+        // After a project the next thing typed is almost always its first task, one level in.
+        if (item.type == Item::Project)
+            c.insertText("\n" + QString(item.level + 1, '\t') + "- ");
+        else
+            c.insertText("\n" + QString(item.level, '\t') + (item.type == Item::Task ? "- " : ""));
     }
     c.endEditBlock();
     return true;
