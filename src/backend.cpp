@@ -9,6 +9,7 @@
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QRandomGenerator>
 #include <QSaveFile>
 #include <QSettings>
@@ -16,6 +17,18 @@
 #include <QUrl>
 
 #include "outline.h"
+
+// The size Omarchy gives its terminal (foot, the default), so TaskPaper's text matches the text around it.
+static double omarchyFontSize() {
+    QFile file(QDir::homePath() + "/.config/foot/foot.ini");
+    if (file.open(QIODevice::ReadOnly)) {
+        static const QRegularExpression size(R"(^font\s*=.*:size=(\d+(?:\.\d+)?))", QRegularExpression::MultilineOption);
+        const auto m = size.match(QString::fromUtf8(file.readAll()));
+        if (m.hasMatch())
+            return m.captured(1).toDouble();
+    }
+    return 9;
+}
 
 Backend::Backend(Theme *theme, const QString &initialFile, QObject *parent)
     : QObject(parent), m_theme(theme), m_initialFile(initialFile) {
@@ -27,8 +40,9 @@ Backend::Backend(Theme *theme, const QString &initialFile, QObject *parent)
     m_save.setInterval(800);
     connect(&m_save, &QTimer::timeout, this, &Backend::save);
     connect(m_theme, &Theme::changed, this, &Backend::applyColors);
-    // One point under the first release's size, which read slightly large.
-    m_fontSize = QSettings("taskpaper", "taskpaper").value("fontSize", 10.0).toDouble();
+    m_defaultFontSize = omarchyFontSize();
+    m_fontDelta = QSettings("taskpaper", "taskpaper").value("fontDelta", 0.0).toDouble();
+    m_fontSize = m_defaultFontSize + m_fontDelta;
 }
 
 // The font Omarchy has picked for monospace (iA Writer Mono S by default); fontconfig is where Omarchy sets it.
@@ -46,12 +60,15 @@ QString Backend::fontFamily() const {
     return family;
 }
 
+// Ctrl+= and Ctrl+- change the size by a point; 0 goes back to Omarchy's size. Only the change is remembered,
+// so a later change to Omarchy's own font size carries over.
 void Backend::changeFontSize(double delta) {
-    const double size = delta == 0 ? 10.0 : qBound(6.0, m_fontSize + delta, 32.0);
-    if (size == m_fontSize)
+    const double next = delta == 0 ? 0.0 : qBound(6.0 - m_defaultFontSize, m_fontDelta + delta, 32.0 - m_defaultFontSize);
+    if (next == m_fontDelta)
         return;
-    m_fontSize = size;
-    QSettings("taskpaper", "taskpaper").setValue("fontSize", size);
+    m_fontDelta = next;
+    m_fontSize = m_defaultFontSize + m_fontDelta;
+    QSettings("taskpaper", "taskpaper").setValue("fontDelta", m_fontDelta);
     emit fontSizeChanged();
 }
 QString Backend::title() const { return m_path.isEmpty() ? tr("Untitled") : QFileInfo(m_path).fileName(); }

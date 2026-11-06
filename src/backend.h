@@ -105,6 +105,7 @@ private:
     QTextCursor m_zoom, m_pin; // cursors, so they follow the lines as text is edited
     double m_fontSize = 10;
     int m_cursor = 0;
+    double m_defaultFontSize = 9, m_fontDelta = 0;
     bool m_zoomed = false, m_applying = false, m_dirty = false;
     QVariantList m_sidebar, m_foldMarks;
     QList<QTextCursor> m_folds; // fold points, as cursors so they follow the lines when text is edited

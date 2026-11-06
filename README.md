@@ -27,7 +27,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | --- | --- |
 | Ctrl+D (or Ctrl+Enter) | Toggle done (adds `@done(today)`) |
 | Ctrl+Shift+A | Archive the selection, or every `@done` item if nothing is selected |
-| Ctrl+9 / Ctrl+0 | Collapse / expand the item (Ctrl+. toggles it) |
+| Ctrl+9 | Collapse the item (Ctrl+. toggles it) |
 | Ctrl+Alt+9 / Ctrl+Alt+0 | Collapse / expand the item and everything inside it |
 | Ctrl+Shift+9 / Ctrl+Shift+0 | Collapse / expand everything |
 | Tab / Shift+Tab (or Ctrl+] / Ctrl+[) | Indent / outdent |
@@ -39,7 +39,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+Shift+F | Filter with the search bar |
 | Ctrl+Alt+F | Save the current search |
 | Ctrl+Alt+S (or Ctrl+B) | Toggle sidebar |
-| Ctrl+= / Ctrl+- | Bigger / smaller text |
+| Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text to Omarchy's size |
 | Ctrl+O / Ctrl+S / Ctrl+Shift+S | Open / Save now / Save As |
 | Ctrl+K | Show all keys |
 | Ctrl+Q | Quit |
@@ -48,4 +48,4 @@ Keys follow TaskPaper with Ctrl for Command and Alt for Option. Reopening a file
 
 Omarchy's single-key `?` and `Q` would type into a document, so help and quit take Ctrl.
 
-Text is Omarchy's monospace font (iA Writer Mono S by default) at 10pt.
+Text is Omarchy's monospace font (iA Writer Mono S by default) at the size of Omarchy's terminal (read from foot.ini).

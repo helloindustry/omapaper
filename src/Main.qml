@@ -120,7 +120,7 @@ ApplicationWindow {
     Shortcut { sequences: ["Ctrl+D", "Ctrl+Return", "Ctrl+Enter"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false) }
-    Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, false, false) }
+    Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(0) }
     Shortcut { sequence: "Ctrl+Alt+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, true, true) }
     Shortcut { sequence: "Ctrl+Alt+0"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, false, true) }
     Shortcut { sequences: ["Ctrl+Shift+9", "Ctrl+("]; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(true) }
@@ -448,7 +448,7 @@ ApplicationWindow {
                     model: [
                         [qsTr("Toggle done"), "Ctrl+D"],
                         [qsTr("Archive done items / selection"), "Ctrl+Shift+A"],
-                        [qsTr("Collapse / expand items"), "Ctrl+9 / Ctrl+0"],
+                        [qsTr("Collapse item (Ctrl+. toggles)"), "Ctrl+9"],
                         [qsTr("Collapse / expand completely"), "Ctrl+Alt+9 / 0"],
                         [qsTr("Collapse / expand all"), "Ctrl+Shift+9 / 0"],
                         [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
@@ -460,7 +460,7 @@ ApplicationWindow {
                         [qsTr("Filter (search bar)"), "Ctrl+Shift+F"],
                         [qsTr("Save search"), "Ctrl+Alt+F"],
                         [qsTr("Toggle sidebar"), "Ctrl+Alt+S"],
-                        [qsTr("Bigger / smaller text"), "Ctrl+= / Ctrl+-"],
+                        [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
                         [qsTr("Open / Save / Save As"), "Ctrl+O / S / Shift+S"],
                         [qsTr("Undo / redo"), "Ctrl+Z / Ctrl+Shift+Z"],
                         [qsTr("This list"), "Ctrl+K"],
