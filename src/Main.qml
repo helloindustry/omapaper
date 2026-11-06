@@ -33,6 +33,10 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Alt+Left"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
     Shortcut { sequence: "Ctrl+Alt+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
     Shortcut { sequence: "Ctrl+Alt+Down"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, 1) }
+    Shortcut { sequence: "Ctrl+Return"; context: Qt.ApplicationShortcut; onActivated: backend.toggleFold(editor.cursorPosition) }
+    Shortcut { sequence: "Ctrl+Alt+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(true) }
+    Shortcut { sequence: "Ctrl+Alt+0"; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(false) }
+    Shortcut { sequence: "Ctrl+Alt+Home"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
     Shortcut { sequence: "Ctrl+]"; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, 1) }
     Shortcut { sequence: "Ctrl+["; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, -1) }
 
@@ -65,9 +69,10 @@ ApplicationWindow {
                         id: row
                         required property var modelData
                         readonly property bool header: modelData.kind === "header"
-                        readonly property bool current: modelData.kind === "project" ? backend.zoomBlock === modelData.block
+                        readonly property bool current: modelData.kind === "project" ? backend.zoomBlock === modelData.block && backend.query === ""
+                                                       : modelData.kind === "all" ? backend.zoomBlock < 0 && backend.query === ""
                                                        : modelData.kind === "header" ? false
-                                                       : backend.query === modelData.query
+                                                       : backend.zoomBlock < 0 && backend.query === modelData.query
                         width: ListView.view.width
                         height: header ? 36 : 26
 
@@ -82,7 +87,7 @@ ApplicationWindow {
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.verticalCenterOffset: row.header ? 6 : 0
                             x: 16 + (row.modelData.level || 0) * 14
-                            width: parent.width - x - (countText.visible ? 40 : 16)
+                            width: parent.width - x - 16
                             text: row.modelData.label
                             elide: Text.ElideRight
                             font.family: backend.fontFamily
@@ -90,24 +95,14 @@ ApplicationWindow {
                             font.bold: row.header
                             color: row.header ? theme.muted : theme.foreground
                         }
-                        Text {
-                            id: countText
-                            visible: row.modelData.kind === "tag"
-                            anchors.right: parent.right
-                            anchors.rightMargin: 16
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: row.modelData.count || ""
-                            font.family: backend.fontFamily
-                            font.pixelSize: 12
-                            color: theme.muted
-                        }
                         HoverHandler { id: hover }
                         TapHandler {
                             acceptedButtons: Qt.LeftButton
                             enabled: !row.header
                             onTapped: {
-                                if (row.modelData.kind === "project") backend.zoomToBlock(row.modelData.block)
-                                else backend.query = row.modelData.query
+                                if (row.modelData.kind === "all") backend.showAll()
+                                else if (row.modelData.kind === "project") backend.showProject(row.modelData.block)
+                                else backend.search(row.modelData.query)
                             }
                         }
                         TapHandler {
@@ -212,8 +207,26 @@ ApplicationWindow {
                         Keys.onTabPressed: event => { backend.indent(editor.selectionStart, editor.selectionEnd, 1); event.accepted = true }
                         Keys.onBacktabPressed: event => { backend.indent(editor.selectionStart, editor.selectionEnd, -1); event.accepted = true }
 
+                        // Disclosure triangles in the left margin, one per item that has children.
+                        Repeater {
+                            model: backend.folds
+                            delegate: Text {
+                                required property var modelData
+                                readonly property rect line: { editor.contentHeight; editor.width; return editor.positionToRectangle(modelData.pos) }
+                                x: 6
+                                y: line.y
+                                height: line.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: modelData.folded ? "▸" : "▾"
+                                font.pixelSize: 15
+                                color: modelData.folded ? theme.accent : theme.muted
+                                TapHandler { onTapped: backend.toggleFoldBlock(modelData.block) }
+                            }
+                        }
+
                         Connections {
                             target: backend
+                            function onCursorRequested(position) { editor.cursorPosition = position }
                             function onMoved(start, end) { editor.select(start, end) }
                         }
                     }
@@ -257,6 +270,9 @@ ApplicationWindow {
                         [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
                         [qsTr("Move up / down"), "Ctrl+Alt+Up / Down"],
                         [qsTr("Zoom in / out"), "Ctrl+Alt+Right / Left"],
+                        [qsTr("Show all"), "Ctrl+Alt+Home"],
+                        [qsTr("Fold / unfold"), "Ctrl+Return"],
+                        [qsTr("Fold all / unfold all"), "Ctrl+Alt+9 / 0"],
                         [qsTr("Search"), "Ctrl+F"],
                         [qsTr("Save search"), "Ctrl+Shift+F"],
                         [qsTr("Toggle sidebar"), "Ctrl+Alt+S"],

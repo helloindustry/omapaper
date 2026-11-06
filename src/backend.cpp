@@ -74,6 +74,7 @@ void Backend::load(const QString &path) {
     m_dirty = false;
     m_path = path;
     m_zoomed = false;
+    m_folds.clear();
     m_pin = QTextCursor();
     QSettings("taskpaper", "taskpaper").setValue("lastFile", path);
     setError({});
@@ -193,6 +194,26 @@ void Backend::refresh() {
         if (root < n)
             visible[root] = true;
     }
+    // A fold hides an item's children. Folds whose item lost its children are dropped.
+    auto parent_has_children = [&](int i) {
+        if (items[i].type == Item::Blank)
+            return false;
+        for (int j = i + 1; j < end[i]; ++j)
+            if (items[j].type != Item::Blank)
+                return true;
+        return false;
+    };
+    for (int f = m_folds.size() - 1; f >= 0; --f) {
+        const int b = m_folds[f].blockNumber();
+        if (b >= n || !parent_has_children(b)) {
+            m_folds.removeAt(f);
+            continue;
+        }
+        if (m_zoomed && b == m_zoom.blockNumber())
+            continue; // zooming into a folded item shows what is inside it
+        for (int j = b + 1; j < end[b]; ++j)
+            visible[j] = false;
+    }
     if (!m_pin.isNull() && m_pin.blockNumber() < n)
         visible[m_pin.blockNumber()] = true;
 
@@ -215,8 +236,18 @@ void Backend::refresh() {
         m_applying = false;
     }
 
+    QVariantList marks;
+    for (int i = 0; i < n; ++i)
+        if (visible[i] && parent_has_children(i))
+            marks << QVariantMap{{"block", i}, {"pos", m_doc->findBlockByNumber(i).position()},
+                                 {"folded", foldIndex(i) >= 0}};
+    if (marks != m_foldMarks) {
+        m_foldMarks = marks;
+        emit foldsChanged();
+    }
+
     QVariantList projects, tags, searches;
-    QMap<QString, int> counts;
+    QMap<QString, QStringList> values;
     for (int i = 0; i < n; ++i) {
         const Item &item = items[i];
         if (item.hasTag("search")) {
@@ -229,13 +260,24 @@ void Backend::refresh() {
             continue;
         if (item.type == Item::Project)
             projects << QVariantMap{{"kind", "project"}, {"label", item.title}, {"level", item.level}, {"block", i}};
-        for (const auto &tag : item.tags)
-            counts[tag.name]++;
+        for (const auto &tag : item.tags) {
+            QStringList &list = values[tag.name];
+            if (tag.hasValue && !tag.value.isEmpty() && !list.contains(tag.value))
+                list << tag.value;
+        }
     }
-    for (auto it = counts.begin(); it != counts.end(); ++it)
-        tags << QVariantMap{{"kind", "tag"}, {"label", "@" + it.key()}, {"query", "@" + it.key()}, {"count", it.value()}};
+    // Each tag, and under it the distinct values it has been given.
+    for (auto it = values.begin(); it != values.end(); ++it) {
+        tags << QVariantMap{{"kind", "tag"}, {"label", "@" + it.key()}, {"query", "@" + it.key()}, {"level", 0}};
+        QStringList sorted = it.value();
+        sorted.sort(Qt::CaseInsensitive);
+        for (const auto &value : sorted)
+            tags << QVariantMap{{"kind", "tag"}, {"label", value}, {"level", 1},
+                                {"query", "@" + it.key() + " = " + value}};
+    }
 
     QVariantList sidebar;
+    sidebar << QVariantMap{{"kind", "all"}, {"label", tr("All")}};
     auto section = [&](const QString &name, const QVariantList &rows) {
         if (!rows.isEmpty())
             sidebar << QVariantMap{{"kind", "header"}, {"label", name}} << rows;
@@ -267,6 +309,71 @@ QString Backend::zoomPath() const {
     for (int b = m_zoom.blockNumber(); b >= 0; b = parentBlock(b))
         path.prepend(parseLine(m_doc->findBlockByNumber(b).text()).title);
     return path.join("  ›  ");
+}
+
+void Backend::search(const QString &query) {
+    m_zoomed = false;
+    m_query = query;
+    m_pin = QTextCursor();
+    emit queryChanged();
+    refresh();
+}
+
+void Backend::showProject(int block) {
+    if (!m_query.isEmpty()) {
+        m_query.clear();
+        emit queryChanged();
+    }
+    zoomToBlock(block);
+}
+
+void Backend::showAll() { search({}); }
+
+bool Backend::hasChildren(int block) const {
+    const QTextBlock b = m_doc->findBlockByNumber(block);
+    const Item item = parseLine(b.text());
+    if (item.type == Item::Blank)
+        return false;
+    for (QTextBlock next = b.next(); next.isValid(); next = next.next()) {
+        const Item other = parseLine(next.text());
+        if (other.type != Item::Blank)
+            return other.level > item.level;
+    }
+    return false;
+}
+
+int Backend::foldIndex(int block) const {
+    for (int i = 0; i < m_folds.size(); ++i)
+        if (m_folds[i].blockNumber() == block)
+            return i;
+    return -1;
+}
+
+void Backend::toggleFoldBlock(int block) {
+    if (!m_doc || !m_doc->findBlockByNumber(block).isValid())
+        return;
+    const int at = foldIndex(block);
+    if (at >= 0)
+        m_folds.removeAt(at);
+    else if (hasChildren(block))
+        m_folds.append(QTextCursor(m_doc->findBlockByNumber(block)));
+    else
+        return;
+    // Keep the caret on the folded line instead of inside the lines that just vanished.
+    emit cursorRequested(m_doc->findBlockByNumber(block).position() + m_doc->findBlockByNumber(block).length() - 1);
+    refresh();
+}
+
+void Backend::toggleFold(int position) { toggleFoldBlock(m_doc->findBlock(position).blockNumber()); }
+
+void Backend::foldAll(bool collapse) {
+    m_folds.clear();
+    if (collapse)
+        for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next())
+            if (hasChildren(b.blockNumber()))
+                m_folds.append(QTextCursor(b));
+    emit cursorRequested(0);
+    refresh();
 }
 
 void Backend::zoomToBlock(int block) {

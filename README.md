@@ -27,6 +27,9 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Tab / Shift+Tab | Indent / outdent |
 | Ctrl+Alt+Up / Down | Move item with its children |
 | Ctrl+Alt+Right / Left | Zoom in / out |
+| Ctrl+Alt+Home | Show the whole document (clears zoom and search) |
+| Ctrl+Return | Fold / unfold the item |
+| Ctrl+Alt+9 / Ctrl+Alt+0 | Fold all / unfold all |
 | Ctrl+F | Search |
 | Ctrl+Shift+F | Save current search |
 | Ctrl+Alt+S | Toggle sidebar |
