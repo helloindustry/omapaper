@@ -153,8 +153,8 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+["; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, -1) }
     Shortcut { sequence: "Ctrl+Shift+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
     Shortcut { sequence: "Ctrl+Shift+Down"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, 1) }
-    Shortcut { sequence: "Ctrl+Shift+I"; context: Qt.ApplicationShortcut; onActivated: backend.zoomIn(editor.cursorPosition) }
-    Shortcut { sequence: "Ctrl+Shift+O"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
+    Shortcut { sequence: "Ctrl+Shift+Right"; context: Qt.ApplicationShortcut; onActivated: backend.zoomIn(editor.cursorPosition) }
+    Shortcut { sequence: "Ctrl+Shift+Left"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
     Shortcut { sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
 
     Item {
@@ -366,6 +366,10 @@ ApplicationWindow {
                             }
                         }
                         Keys.onPressed: event => {
+                            // The editor claims Ctrl+Shift+Left/Right itself (select by word), so a Shortcut never sees them.
+                            const ctrlShift = (event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier) && !(event.modifiers & Qt.AltModifier)
+                            if (ctrlShift && event.key === Qt.Key_Right) { backend.zoomIn(editor.cursorPosition); event.accepted = true; return }
+                            if (ctrlShift && event.key === Qt.Key_Left) { backend.zoomOut(); event.accepted = true; return }
                             if (event.key === Qt.Key_End && acceptSuggestion()) {
                                 event.accepted = true
                                 return
@@ -694,7 +698,7 @@ ApplicationWindow {
                         [qsTr("Collapse / expand all"), "Ctrl+Shift+9 / 0"],
                         [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
                         [qsTr("Move up / down"), "Ctrl+Shift+Up / Down"],
-                        [qsTr("Focus in / out"), "Ctrl+Shift+I / O"],
+                        [qsTr("Focus in / out"), "Ctrl+Shift+Right / Left"],
                         [qsTr("Home (whole document)"), "Ctrl+H"],
                         [qsTr("Find and replace"), "Ctrl+F"],
                         [qsTr("Find next / previous"), "Ctrl+G / Ctrl+Shift+G"],
