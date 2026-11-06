@@ -384,11 +384,12 @@ void Backend::refresh() {
             visible[root] = true;
     }
     // A fold hides an item's children. Folds whose item lost its children are dropped.
+    // Only an item with something indented beneath it can fold, and gets an arrow.
     auto parent_has_children = [&](int i) {
         if (items[i].type == Item::Blank)
             return false;
         for (int j = i + 1; j < end[i]; ++j)
-            if (items[j].type != Item::Blank)
+            if (items[j].type != Item::Blank && items[j].level > items[i].level)
                 return true;
         return false;
     };
@@ -529,8 +530,12 @@ bool Backend::hasChildren(int block) const {
         return false;
     for (QTextBlock next = b.next(); next.isValid(); next = next.next()) {
         const Item other = parseLine(next.text());
-        if (other.type != Item::Blank)
-            return !endsSubtree(item, other);
+        if (other.type == Item::Blank)
+            continue;
+        if (endsSubtree(item, other))
+            return false;
+        if (other.level > item.level)
+            return true;
     }
     return false;
 }
