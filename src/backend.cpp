@@ -114,14 +114,16 @@ void Backend::attach(QQuickTextDocument *document) {
     // No file given: open the last one, or start the default list, so typing can begin at once.
     QSettings settings("taskpaper", "taskpaper");
     QString path = m_initialFile;
-    if (path.isEmpty())
+    if (path.isEmpty() && QFileInfo::exists(settings.value("lastFile").toString()))
         path = settings.value("lastFile").toString();
     if (path.isEmpty())
         path = QDir::homePath() + "/Documents/Tasks.taskpaper";
     load(path);
 }
 
-void Backend::load(const QString &path) {
+void Backend::load(const QString &requested) {
+    // Always absolute, so the remembered file still resolves when the app is next started from somewhere else.
+    const QString path = QFileInfo(requested).absoluteFilePath();
     QString text;
     QFile file(path);
     if (file.exists()) {
