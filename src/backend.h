@@ -119,6 +119,7 @@ private:
     QPair<int, int> blockRange(int start, int end) const;
     int subtreeEnd(int block) const;
     bool hasChildren(int block) const;
+    int enclosingParent(int block) const; // nearest line above that is indented less, or -1
     int foldEnd(int block) const; // end of the lines indented beneath an item
     int foldIndex(int block) const;
 

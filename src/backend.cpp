@@ -677,6 +677,16 @@ int Backend::foldEnd(int block) const {
     return i;
 }
 
+int Backend::enclosingParent(int block) const {
+    const int indent = parseLine(m_doc->findBlockByNumber(block).text()).indent;
+    for (QTextBlock b = m_doc->findBlockByNumber(block).previous(); b.isValid(); b = b.previous()) {
+        const Item item = parseLine(b.text());
+        if (item.type != Item::Blank && item.indent < indent)
+            return b.blockNumber();
+    }
+    return -1;
+}
+
 bool Backend::hasChildren(int block) const {
     const QTextBlock start = m_doc->findBlockByNumber(block);
     if (parseLine(start.text()).type == Item::Blank)
@@ -710,17 +720,36 @@ void Backend::toggleFoldBlock(int block) {
     persistCursor();
 }
 
-void Backend::toggleFold(int position) { toggleFoldBlock(m_doc->findBlock(position).blockNumber()); }
+// On a line with nothing beneath it, the fold keys fold the line's parent instead and leave the caret on it.
+void Backend::toggleFold(int position) {
+    int block = m_doc->findBlock(position).blockNumber();
+    if (!hasChildren(block)) {
+        block = enclosingParent(block);
+        if (block < 0)
+            return;
+    }
+    toggleFoldBlock(block);
+}
 
 // Collapse or expand every item in the selection; "completely" does the same to all their descendants.
 void Backend::foldItems(int start, int end, bool collapse, bool completely) {
     if (!m_doc)
         return;
     const auto range = blockRange(start, end);
+    int caretBlock = range.first;
     for (int i = range.first; i <= range.second; ++i) {
-        QList<int> targets{i};
+        int base = i;
+        if (collapse && !hasChildren(i)) {
+            // Nothing beneath this line to fold: fold the line it sits inside instead.
+            base = enclosingParent(i);
+            if (base < 0)
+                continue;
+            if (i == range.first)
+                caretBlock = base;
+        }
+        QList<int> targets{base};
         if (completely)
-            for (int j = i + 1; j < foldEnd(i); ++j)
+            for (int j = base + 1; j < foldEnd(base); ++j)
                 targets << j;
         for (int t : targets) {
             if (!hasChildren(t))
@@ -733,7 +762,7 @@ void Backend::foldItems(int start, int end, bool collapse, bool completely) {
         }
     }
     if (collapse) {
-        const QTextBlock b = m_doc->findBlockByNumber(range.first);
+        const QTextBlock b = m_doc->findBlockByNumber(caretBlock);
         emit cursorRequested(b.position() + b.length() - 1);
     }
     refresh();
