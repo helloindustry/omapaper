@@ -426,6 +426,8 @@ void Backend::toggleFoldBlock(int block) {
 
 void Backend::toggleFold(int position) { toggleFoldBlock(m_doc->findBlock(position).blockNumber()); }
 
+void Backend::toggleFoldAll() { foldAll(m_folds.isEmpty()); }
+
 void Backend::foldAll(bool collapse) {
     m_folds.clear();
     if (collapse)

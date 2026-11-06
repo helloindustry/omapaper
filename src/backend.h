@@ -50,6 +50,7 @@ public:
     Q_INVOKABLE void toggleFold(int position);
     Q_INVOKABLE void toggleFoldBlock(int block);
     Q_INVOKABLE void foldAll(bool collapse);
+    Q_INVOKABLE void toggleFoldAll(); // unfolds if anything is folded, otherwise folds everything
     Q_INVOKABLE void zoomToBlock(int block);
     Q_INVOKABLE void zoomIn(int position);
     Q_INVOKABLE void zoomOut();

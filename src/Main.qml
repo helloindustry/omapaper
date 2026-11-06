@@ -31,20 +31,18 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(0) }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
     Shortcut { sequence: "Ctrl+F"; context: Qt.ApplicationShortcut; onActivated: { search.forceActiveFocus(); search.selectAll() } }
-    Shortcut { sequence: "Ctrl+Shift+F"; context: Qt.ApplicationShortcut; onActivated: backend.saveSearch() }
-    Shortcut { sequence: "Ctrl+Alt+S"; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
+    Shortcut { sequence: "Ctrl+G"; context: Qt.ApplicationShortcut; onActivated: backend.saveSearch() }
+    Shortcut { sequence: "Ctrl+B"; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
     Shortcut { sequences: ["Ctrl+Return", "Ctrl+Enter", "Ctrl+D"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
-    Shortcut { sequence: "Ctrl+Alt+Right"; context: Qt.ApplicationShortcut; onActivated: backend.zoomIn(editor.cursorPosition) }
-    Shortcut { sequence: "Ctrl+Alt+Left"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
-    Shortcut { sequence: "Ctrl+Alt+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
-    Shortcut { sequence: "Ctrl+Alt+Down"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, 1) }
-    Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
-    Shortcut { sequences: ["Ctrl+.", "Ctrl+Alt+Return"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleFold(editor.cursorPosition) }
-    Shortcut { sequence: "Ctrl+Alt+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(true) }
-    Shortcut { sequence: "Ctrl+Alt+0"; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(false) }
-    Shortcut { sequence: "Ctrl+Alt+Home"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
-    Shortcut { sequence: "Ctrl+]"; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, 1) }
-    Shortcut { sequence: "Ctrl+["; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, -1) }
+    Shortcut { sequence: "Ctrl+]"; context: Qt.ApplicationShortcut; onActivated: backend.zoomIn(editor.cursorPosition) }
+    Shortcut { sequence: "Ctrl+["; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
+    Shortcut { sequence: "Ctrl+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
+    Shortcut { sequence: "Ctrl+Down"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, 1) }
+    Shortcut { sequence: "Ctrl+E"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
+    Shortcut { sequence: "Ctrl+."; context: Qt.ApplicationShortcut; onActivated: backend.toggleFold(editor.cursorPosition) }
+    Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; onActivated: backend.toggleFoldAll() }
+    Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; onActivated: backend.save() }
+    Shortcut { sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
 
     Item {
         anchors.fill: parent
@@ -291,18 +289,18 @@ ApplicationWindow {
                     model: [
                         [qsTr("Toggle done"), "Ctrl+Enter / Ctrl+D"],
                         [qsTr("Fold / unfold"), "Ctrl+."],
-                        [qsTr("Fold all / unfold all"), "Ctrl+Alt+9 / 0"],
-                        [qsTr("Archive selection (or all done)"), "Ctrl+Shift+A"],
+                        [qsTr("Fold all / unfold all"), "Ctrl+,"],
+                        [qsTr("Archive selection (or all done)"), "Ctrl+E"],
                         [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
-                        [qsTr("Move up / down"), "Ctrl+Alt+Up / Down"],
-                        [qsTr("Zoom in / out"), "Ctrl+Alt+Right / Left"],
-                        [qsTr("Home (whole document)"), "Ctrl+Alt+Home"],
+                        [qsTr("Move up / down"), "Ctrl+Up / Down"],
+                        [qsTr("Zoom in / out"), "Ctrl+] / Ctrl+["],
+                        [qsTr("Home (whole document)"), "Ctrl+H"],
                         [qsTr("Search"), "Ctrl+F"],
-                        [qsTr("Save search"), "Ctrl+Shift+F"],
-                        [qsTr("Toggle sidebar"), "Ctrl+Alt+S"],
+                        [qsTr("Save search"), "Ctrl+G"],
+                        [qsTr("Toggle sidebar"), "Ctrl+B"],
                         [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
                         [qsTr("Open"), "Ctrl+O"],
-                        [qsTr("Save As"), "Ctrl+Shift+S"],
+                        [qsTr("Save / Save As"), "Ctrl+S / Ctrl+Shift+S"],
                         [qsTr("Undo / redo"), "Ctrl+Z / Ctrl+Shift+Z"],
                         [qsTr("This list"), "Ctrl+K"],
                         [qsTr("Quit"), "Ctrl+Q"]
