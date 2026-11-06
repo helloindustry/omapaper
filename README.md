@@ -49,7 +49,7 @@ Typing `@` and a letter offers a tag that is already in the document (`@M` sugge
 
 Ctrl+click adds more carets, and typing, Backspace, Delete, arrows, Enter and Tab then act at all of them (Esc or a plain click goes back to one). Triple-click selects a line; dragging from the third click extends by whole lines. Drag the edge of the sidebar to resize it, or drag it nearly shut to collapse it.
 
-Every key is Ctrl+key or Ctrl+Shift+key (TaskPaper's where known). Reopening a file puts the cursor back where you left it and restores which items were folded.
+Every key is Ctrl+key or Ctrl+Shift+key (TaskPaper's where known). Reopening a file puts the cursor back where you left it and restores which items were folded, which tags are collapsed in the sidebar, and whether the sidebar is open.
 
 Omarchy's single-key `?` and `Q` would type into a document, so help and quit take Ctrl.
 

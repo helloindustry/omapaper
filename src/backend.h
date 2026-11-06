@@ -55,6 +55,8 @@ public:
     Q_INVOKABLE void saveSidebarWidth();
     Q_INVOKABLE QVariantList lineRange(int position) const; // the line's own text
     Q_INVOKABLE void toggleTagFold(const QString &name);
+    Q_INVOKABLE bool sidebarShown() const;
+    Q_INVOKABLE void setSidebarShown(bool shown);
     // More than one caret: Ctrl+click adds one, and typing then happens at every caret at once.
     Q_INVOKABLE void addCursor(int position, int primary);
     Q_INVOKABLE void clearCursors();

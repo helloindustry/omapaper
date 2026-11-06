@@ -135,6 +135,9 @@ void Backend::load(const QString &path) {
         if (block < m_doc->blockCount() && foldIndex(block) < 0 && hasChildren(block))
             m_folds.append(QTextCursor(m_doc->findBlockByNumber(block)));
     }
+    m_collapsedTags.clear();
+    for (const QString &name : QSettings("taskpaper", "taskpaper").value("collapsedTags/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding))).toString().split(',', Qt::SkipEmptyParts))
+        m_collapsedTags.insert(name);
     m_pin = QTextCursor();
     QSettings("taskpaper", "taskpaper").setValue("lastFile", path);
     setError({});
@@ -240,10 +243,14 @@ QVariantList Backend::lineRange(int position) const {
 
 void Backend::saveSidebarWidth() { QSettings("taskpaper", "taskpaper").setValue("sidebarWidth", m_sidebarWidth); }
 
+bool Backend::sidebarShown() const { return QSettings("taskpaper", "taskpaper").value("sidebarShown", true).toBool(); }
+void Backend::setSidebarShown(bool shown) { QSettings("taskpaper", "taskpaper").setValue("sidebarShown", shown); }
+
 void Backend::toggleTagFold(const QString &name) {
     if (!m_collapsedTags.remove(name))
         m_collapsedTags.insert(name);
     refresh();
+    persistCursor();
 }
 
 // ---- several carets at once -------------------------------------------------------
@@ -337,6 +344,9 @@ void Backend::persistCursor() {
     for (const auto &fold : m_folds)
         folded << QString::number(fold.blockNumber());
     settings.setValue("folds/" + key, folded.join(','));
+    QStringList tags = m_collapsedTags.values();
+    tags.sort();
+    settings.setValue("collapsedTags/" + key, tags.join(','));
 }
 
 void Backend::save() {

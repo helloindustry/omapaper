@@ -18,7 +18,8 @@ ApplicationWindow {
     Material.roundedScale: theme.radius
 
     readonly property real fs: backend.fontSize // the size everything else scales from
-    property bool sidebarVisible: true
+    property bool sidebarVisible: backend.sidebarShown() // remembered between runs
+    onSidebarVisibleChanged: backend.setSidebarShown(sidebarVisible)
     property bool helpVisible: false
     property bool findVisible: false
     property bool searchOpen: false // the filter bar shows only while it is focused or a search is active
