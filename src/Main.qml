@@ -387,6 +387,10 @@ ApplicationWindow {
                             const ctrlShift = (event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier) && !(event.modifiers & Qt.AltModifier)
                             if (ctrlShift && event.key === Qt.Key_Right) { backend.zoomIn(editor.cursorPosition); event.accepted = true; return }
                             if (ctrlShift && event.key === Qt.Key_Left) { backend.zoomOut(); event.accepted = true; return }
+                            // Collapse / expand all. The shortcuts above can miss when the keyboard reports Shift+9 as "(" and
+                            // Shift+0 as ")", so the editor answers those keys itself.
+                            if (ctrlShift && (event.key === Qt.Key_9 || event.key === Qt.Key_ParenLeft)) { backend.foldAll(true); event.accepted = true; return }
+                            if (ctrlShift && (event.key === Qt.Key_0 || event.key === Qt.Key_ParenRight)) { backend.foldAll(false); event.accepted = true; return }
                             if (event.key === Qt.Key_End && acceptSuggestion()) {
                                 event.accepted = true
                                 return
