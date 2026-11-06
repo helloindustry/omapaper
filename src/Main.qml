@@ -111,7 +111,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveAsDialog() }
     Shortcut { sequences: ["Ctrl+=", "Ctrl++"]; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(1) }
     Shortcut { sequence: "Ctrl+-"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(-1) }
-    Shortcut { sequence: "Ctrl+F"; context: Qt.ApplicationShortcut; onActivated: win.openFind() }
+    Shortcut { sequence: "Ctrl+F"; context: Qt.ApplicationShortcut; onActivated: win.findVisible ? win.closeFind() : win.openFind() }
     Shortcut { sequence: "Ctrl+G"; context: Qt.ApplicationShortcut; onActivated: win.findAgain(false) }
     Shortcut { sequence: "Ctrl+Shift+G"; context: Qt.ApplicationShortcut; onActivated: win.findAgain(true) }
     Shortcut { sequence: "Ctrl+Shift+F"; context: Qt.ApplicationShortcut; onActivated: { search.forceActiveFocus(); search.selectAll() } }
@@ -135,6 +135,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
 
     Item {
+        id: content
         anchors.fill: parent
         LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
         LayoutMirroring.childrenInherit: true
@@ -362,8 +363,16 @@ ApplicationWindow {
             }
         }
 
+        // A click anywhere outside the find panel closes it, and still reaches whatever is under it.
+        MouseArea {
+            anchors.fill: parent
+            enabled: win.findVisible
+            onPressed: mouse => { win.closeFind(); mouse.accepted = false }
+        }
+
         // Find and replace, in the top right corner.
         Rectangle {
+            id: findPanel
             visible: win.findVisible
             anchors.top: parent.top
             anchors.right: parent.right
