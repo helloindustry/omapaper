@@ -146,6 +146,8 @@ private:
     double m_defaultFontSize = 9, m_fontDelta = 0;
     bool m_zoomed = false, m_applying = false, m_dirty = false;
     QVariantList m_sidebar, m_foldMarks;
+    QList<QTextCursor> m_refold; // items unfolded only because the view was focused into them; folded again on the way out
+    void releaseRefolds();
     QList<QTextCursor> m_folds; // fold points, as cursors so they follow the lines when text is edited
     QTimer m_refresh, m_save, m_noticeTimer;
 };

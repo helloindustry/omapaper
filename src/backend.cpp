@@ -129,6 +129,7 @@ void Backend::load(const QString &path) {
     m_cursor = qBound(0, remembered, qMax(0, m_doc->characterCount() - 1));
     m_zoomed = false;
     m_folds.clear();
+    m_refold.clear();
     const QString foldKey = "folds/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding));
     for (const QString &number : QSettings("taskpaper", "taskpaper").value(foldKey).toString().split(',', Qt::SkipEmptyParts)) {
         const int block = number.toInt();
@@ -341,7 +342,7 @@ void Backend::persistCursor() {
     settings.setValue("cursor/" + key, m_cursor);
     // Which items are folded, as line numbers, so the outline reopens the way it was left.
     QStringList folded;
-    for (const auto &fold : m_folds)
+    for (const auto &fold : m_folds + m_refold)
         folded << QString::number(fold.blockNumber());
     settings.setValue("folds/" + key, folded.join(','));
     QStringList tags = m_collapsedTags.values();
@@ -662,6 +663,7 @@ QString Backend::zoomPath() const {
 
 void Backend::search(const QString &query) {
     m_zoomed = false;
+    releaseRefolds();
     m_query = query;
     m_pin = QTextCursor();
     emit queryChanged();
@@ -845,14 +847,30 @@ void Backend::foldAll(bool collapse) {
     persistCursor();
 }
 
+void Backend::releaseRefolds() {
+    for (int i = m_refold.size() - 1; i >= 0; --i) {
+        const int b = m_refold[i].blockNumber();
+        const bool stillInside = m_zoomed && m_zoom.blockNumber() >= b && m_zoom.blockNumber() < foldEnd(b);
+        if (stillInside)
+            continue;
+        if (foldIndex(b) < 0 && hasChildren(b))
+            m_folds.append(QTextCursor(m_doc->findBlockByNumber(b)));
+        m_refold.removeAt(i);
+    }
+}
+
 void Backend::zoomToBlock(int block) {
     if (!m_doc || !m_doc->findBlockByNumber(block).isValid())
         return;
     m_zoom = QTextCursor(m_doc->findBlockByNumber(block));
     m_zoomed = true;
-    // Zooming into a folded item shows what is inside it; folding it again while zoomed works as usual.
-    if (const int at = foldIndex(block); at >= 0)
+    // Whatever was unfolded for an earlier focus is folded again unless the new focus is still inside it.
+    releaseRefolds();
+    // Focusing into a folded item shows what is inside it. It is remembered, and folded again on the way out.
+    if (const int at = foldIndex(block); at >= 0) {
+        m_refold.append(m_folds[at]);
         m_folds.removeAt(at);
+    }
     m_pin = QTextCursor();
     refresh();
     const QTextBlock root = m_doc->findBlockByNumber(block);
@@ -867,6 +885,7 @@ void Backend::zoomIn(int position) {
 
 void Backend::clearZoom() {
     m_zoomed = false;
+    releaseRefolds();
     m_pin = QTextCursor();
     refresh();
 }
