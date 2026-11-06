@@ -5,6 +5,7 @@
 #include <QTextCursor>
 #include <QMap>
 #include <QSet>
+#include <QFileSystemWatcher>
 #include <QTimer>
 #include <QVariantList>
 
@@ -119,6 +120,9 @@ private slots:
 
 private:
     void load(const QString &path);
+    void watchFile();
+    void externalChange();
+    void showNotice(const QString &message);
     void persistCursor();
     void refresh();
     void onChange(int position, int removed, int added);
@@ -152,5 +156,7 @@ private:
     QList<QTextCursor> m_refold; // items unfolded only because the view was focused into them; folded again on the way out
     void releaseRefolds();
     QList<QTextCursor> m_folds; // fold points, as cursors so they follow the lines when text is edited
-    QTimer m_refresh, m_save, m_noticeTimer;
+    QTimer m_refresh, m_save, m_noticeTimer, m_external;
+    QFileSystemWatcher m_watcher;
+    QString m_disk; // what the file held when we last read or wrote it, to tell our own saves from someone else's
 };

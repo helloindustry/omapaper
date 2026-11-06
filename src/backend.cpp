@@ -1,6 +1,7 @@
 #include "backend.h"
 
 #include <QDate>
+#include <QDateTime>
 #include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusMessage>
@@ -47,6 +48,12 @@ Backend::Backend(Theme *theme, const QString &initialFile, QObject *parent)
     m_noticeTimer.setSingleShot(true);
     m_noticeTimer.setInterval(3000);
     connect(&m_noticeTimer, &QTimer::timeout, this, [this] { m_notice.clear(); emit noticeChanged(); });
+    // Another computer editing the same file (through a sync service) shows up here as a change on disk.
+    m_external.setSingleShot(true);
+    m_external.setInterval(300); // lets a sync finish writing before we read
+    connect(&m_external, &QTimer::timeout, this, &Backend::externalChange);
+    connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, [this] { m_external.start(); });
+    connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this] { m_external.start(); });
     connect(m_theme, &Theme::changed, this, &Backend::applyColors);
     m_sidebarWidth = QSettings("taskpaper", "taskpaper").value("sidebarWidth", 240.0).toDouble();
     m_defaultFontSize = omarchyFontSize();
@@ -87,6 +94,12 @@ void Backend::applyColors() {
         m_highlighter->setColors(m_theme->accent(), m_theme->muted());
 }
 
+void Backend::showNotice(const QString &message) {
+    m_notice = message;
+    emit noticeChanged();
+    m_noticeTimer.start();
+}
+
 void Backend::setError(const QString &message) {
     m_error = message;
     emit errorChanged();
@@ -124,6 +137,8 @@ void Backend::load(const QString &path) {
     m_applying = false;
     m_dirty = false;
     m_path = path;
+    m_disk = text;
+    watchFile();
     const int remembered = QSettings("taskpaper", "taskpaper")
                                .value("cursor/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding)), 0).toInt();
     m_cursor = qBound(0, remembered, qMax(0, m_doc->characterCount() - 1));
@@ -219,9 +234,7 @@ void Backend::print() {
     auto *lp = new QProcess(this);
     connect(lp, &QProcess::finished, this, [this, lp, path](int code, QProcess::ExitStatus) {
         if (code == 0) {
-            m_notice = tr("Sent to the printer");
-            emit noticeChanged();
-            m_noticeTimer.start();
+            showNotice(tr("Sent to the printer"));
         } else {
             // lp says why: no printer set up, printer offline, and so on.
             setError(tr("Can't print: %1").arg(QString::fromUtf8(lp->readAllStandardError()).trimmed()));
@@ -380,6 +393,99 @@ void Backend::openDialog() {
 }
 
 // Save As is the desktop's own dialog too; the document then continues in the new file.
+// A save or a sync replaces the file, which drops it from the watch, so watch its folder too and re-arm every time.
+void Backend::watchFile() {
+    const auto paths = m_watcher.files() + m_watcher.directories();
+    if (!paths.isEmpty())
+        m_watcher.removePaths(paths);
+    if (m_path.isEmpty())
+        return;
+    if (QFileInfo::exists(m_path))
+        m_watcher.addPath(m_path);
+    m_watcher.addPath(QFileInfo(m_path).absolutePath());
+}
+
+// The part of two texts that differs: how much they share at the start and end.
+struct Span { int start, oldLength, newLength; };
+static Span differ(const QString &a, const QString &b) {
+    int p = 0;
+    const int most = qMin(a.size(), b.size());
+    while (p < most && a[p] == b[p])
+        ++p;
+    int s = 0;
+    while (s < most - p && a[a.size() - 1 - s] == b[b.size() - 1 - s])
+        ++s;
+    return {p, int(a.size()) - p - s, int(b.size()) - p - s};
+}
+
+// The file changed on disk. If it is only someone else's edit, apply it in place so the caret, folds and zoom
+// stay put; if we also have unsaved edits, merge when they touch different places, and otherwise keep ours
+// and set theirs aside as a copy so nothing is lost.
+void Backend::externalChange() {
+    watchFile();
+    if (!m_doc || m_path.isEmpty())
+        return;
+    QFile file(m_path);
+    if (!file.open(QIODevice::ReadOnly))
+        return; // being replaced; the folder watch fires again when it is back
+    const QString remote = QString::fromUtf8(file.readAll()).replace("\r\n", "\n");
+    file.close();
+    if (remote == m_disk)
+        return;
+    const QString local = m_doc->toPlainText();
+    if (local == remote) {
+        m_disk = remote;
+        m_dirty = false;
+        return;
+    }
+
+    const QString base = m_disk;
+    const Span theirs = differ(base, remote);
+    const Span ours = differ(base, local);
+    int at, removeLength;
+    QString insert;
+    bool merged = false;
+    if (local == base) {
+        at = theirs.start;
+        removeLength = theirs.oldLength;
+        insert = remote.mid(theirs.start, theirs.newLength);
+    } else if (ours.start + ours.oldLength < theirs.start || theirs.start + theirs.oldLength < ours.start) {
+        // Different places: apply their change, shifted by however much ours moved the text before it.
+        const int shift = ours.start < theirs.start ? ours.newLength - ours.oldLength : 0;
+        at = theirs.start + shift;
+        removeLength = theirs.oldLength;
+        insert = remote.mid(theirs.start, theirs.newLength);
+        merged = true;
+    } else {
+        const QFileInfo info(m_path);
+        const QString copy = info.absolutePath() + "/" + info.completeBaseName() + " (conflict "
+                             + QDateTime::currentDateTime().toString("yyyy-MM-dd HHmm") + ")."
+                             + (info.suffix().isEmpty() ? "taskpaper" : info.suffix());
+        QSaveFile out(copy);
+        if (out.open(QIODevice::WriteOnly) && out.write(remote.toUtf8()) >= 0 && out.commit())
+            showNotice(tr("Edited elsewhere in the same place. Kept yours; theirs is saved as %1").arg(QFileInfo(copy).fileName()));
+        else
+            setError(tr("Edited elsewhere in the same place, and their copy couldn't be saved"));
+        m_disk = remote;
+        m_dirty = true;
+        m_save.start();
+        return;
+    }
+
+    m_applying = true; // not a user edit: it must not pin a line, mark the file changed, or save
+    QTextCursor c(m_doc);
+    c.setPosition(at);
+    c.setPosition(at + removeLength, QTextCursor::KeepAnchor);
+    c.insertText(insert);
+    m_applying = false;
+    m_disk = remote;
+    m_dirty = merged;
+    if (merged)
+        m_save.start();
+    m_refresh.start();
+    showNotice(tr("Updated from another computer"));
+}
+
 void Backend::saveAsDialog() {
     auto bus = QDBusConnection::sessionBus();
     const QString token = "taskpaper" + QString::number(QRandomGenerator::global()->generate());
@@ -403,6 +509,7 @@ void Backend::saveAsResponse(uint code, const QVariantMap &results) {
     m_path = QUrl(list.first()).toLocalFile();
     QSettings("taskpaper", "taskpaper").setValue("lastFile", m_path);
     QFile(m_path).open(QIODevice::WriteOnly | QIODevice::Append); // creates it, so an empty document still gets a file
+    m_disk.clear();
     m_dirty = true;
     save();
     emit fileChanged();
