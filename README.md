@@ -15,6 +15,8 @@ Inbox:
 `@tag(value)` are tags. Indent with tabs. Edits are saved to the file as you type
 (`~/Documents/Tasks.taskpaper` the first time, then the last file you opened).
 
+Links (`https://…`, `www.…`, `mailto:`) are underlined and open in your browser when clicked.
+
 `taskpaper [file]` opens a specific file. Search syntax: `@done`, `not @done`,
 `@due < today`, `project Inbox`, `task milk`, joined with `and` / `or`.
 Saved searches live in the file under a `Searches:` project as `@search(query)`.

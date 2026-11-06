@@ -24,6 +24,15 @@ private slots:
         QCOMPARE(item.title, QString("call me@example.com"));
     }
 
+    void findsLinks()
+    {
+        const auto links = findLinks("- see (https://example.com/a?b=1), or www.example.org. Done");
+        QCOMPARE(links.size(), 2);
+        QCOMPARE(links[0].url, QString("https://example.com/a?b=1"));
+        QCOMPARE(links[1].url, QString("https://www.example.org"));
+        QVERIFY(findLinks("mail me@example.com").isEmpty());
+    }
+
     void filters()
     {
         const Item done = parseLine("- a @done(2026-11-05)"), open = parseLine("- b @due(2026-12-01)");

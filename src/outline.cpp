@@ -175,3 +175,27 @@ bool Query::matches(const Item &item) const {
     }
     return false;
 }
+
+QList<Link> findLinks(const QString &line) {
+    static const QRegularExpression expression(R"re((?:(?:https?|ftp|file|mailto):|(?<![\w.])www\.)[^\s<>"]+)re",
+                                               QRegularExpression::CaseInsensitiveOption);
+    QList<Link> links;
+    auto matches = expression.globalMatch(line);
+    while (matches.hasNext()) {
+        const auto m = matches.next();
+        QString text = m.captured(0);
+        // Punctuation that ends a sentence, or closes one, isn't part of the address.
+        while (!text.isEmpty() && QString(".,;:!?'\u201d").contains(text.back()))
+            text.chop(1);
+        if (text.endsWith(')') && !text.contains('('))
+            text.chop(1);
+        if (text.size() < 5)
+            continue;
+        Link link;
+        link.start = m.capturedStart(0);
+        link.length = text.size();
+        link.url = text.startsWith("www.", Qt::CaseInsensitive) ? "https://" + text : text;
+        links.append(link);
+    }
+    return links;
+}

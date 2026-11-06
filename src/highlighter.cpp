@@ -32,6 +32,13 @@ void Highlighter::highlightBlock(const QString &text) {
         }
     }
 
+    for (const auto &link : findLinks(text)) {
+        QTextCharFormat linkFormat = format(link.start);
+        linkFormat.setForeground(m_accent);
+        linkFormat.setFontUnderline(true);
+        setFormat(link.start, link.length, linkFormat);
+    }
+
     for (const auto &tag : item.tags) {
         QTextCharFormat tagFormat = format(tag.start);
         tagFormat.setForeground(done ? m_muted : m_accent);

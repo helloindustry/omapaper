@@ -52,6 +52,7 @@ public:
     Q_INVOKABLE void saveSearch();
     Q_INVOKABLE void deleteBlock(int block);
 
+    Q_INVOKABLE QString linkAt(int position) const; // the address under a character, or empty
     Q_INVOKABLE bool newline(int position);
     Q_INVOKABLE void indent(int start, int end, int direction);
     Q_INVOKABLE void toggleDone(int start, int end);

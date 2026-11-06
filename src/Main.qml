@@ -199,6 +199,19 @@ ApplicationWindow {
                         placeholderTextColor: theme.muted
                         Component.onCompleted: backend.attach(textDocument)
 
+                        // Links open on a click and show a pointing hand, as in TaskPaper.
+                        property bool overLink: false
+                        HoverHandler {
+                            onPointChanged: editor.overLink = backend.linkAt(editor.positionAt(point.position.x, point.position.y)) !== ""
+                        }
+                        HoverHandler { enabled: editor.overLink; cursorShape: Qt.PointingHandCursor }
+                        TapHandler {
+                            onTapped: eventPoint => {
+                                const url = backend.linkAt(editor.positionAt(eventPoint.position.x, eventPoint.position.y))
+                                if (url !== "") Qt.openUrlExternally(url)
+                            }
+                        }
+
                         FontMetrics { id: fontMetrics; font: editor.font }
 
                         // A Keys handler accepts the key unless told otherwise, so say so when the default Return should run.

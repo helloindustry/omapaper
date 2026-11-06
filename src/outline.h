@@ -27,6 +27,13 @@ struct Item {
 
 Item parseLine(const QString &line);
 
+// A web, mail, or file address inside a line, so it can be underlined and clicked.
+struct Link {
+    int start = 0, length = 0;
+    QString url; // what to open; "www." addresses get https://
+};
+QList<Link> findLinks(const QString &line);
+
 // Whether `next` (a non-blank item after `root`) falls outside root's children.
 // Children are normally the deeper-indented lines. A project also keeps the plain
 // tasks and notes that follow it at its own level, so a list typed without

@@ -473,6 +473,17 @@ int Backend::subtreeEnd(int block) const {
     return i;
 }
 
+QString Backend::linkAt(int position) const {
+    if (!m_doc || position < 0)
+        return {};
+    const QTextBlock b = m_doc->findBlock(position);
+    const int column = position - b.position();
+    for (const auto &link : findLinks(b.text()))
+        if (column >= link.start && column <= link.start + link.length)
+            return link.url;
+    return {};
+}
+
 // Enter continues a list: a new task under a task, the same indent otherwise.
 bool Backend::newline(int position) {
     const QTextBlock b = m_doc->findBlock(position);
