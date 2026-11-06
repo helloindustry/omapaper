@@ -674,23 +674,53 @@ void Backend::search(const QString &query) {
         }
 }
 
-void Backend::exclude(const QString &term) {
-    const QString clause = "not " + term;
-    QStringList parts = m_query.trimmed().isEmpty() ? QStringList() : m_query.split(QRegularExpression(R"(\s+and\s+)", QRegularExpression::CaseInsensitiveOption));
-    QString next;
-    if (parts.contains(clause, Qt::CaseInsensitive)) {
-        // Already filtered out: take it away again.
-        for (int i = parts.size() - 1; i >= 0; --i)
-            if (parts[i].compare(clause, Qt::CaseInsensitive) == 0)
-                parts.removeAt(i);
-        next = parts.join(" and ");
-    } else if (parts.isEmpty() || m_query.contains(QRegularExpression(R"(\s+or\s+)", QRegularExpression::CaseInsensitiveOption))) {
-        next = clause; // an "or" search can't take an extra "and not" safely, so start fresh
-    } else {
-        next = m_query.trimmed() + " and " + clause;
-    }
-    search(next);
+// The search is a chain of terms joined by "and". Clicking builds it up one term at a time, and clicking a term
+// that is already there takes it out again.
+static QStringList searchParts(const QString &query) {
+    if (query.trimmed().isEmpty())
+        return {};
+    static const QRegularExpression andSplit(R"(\s+and\s+)", QRegularExpression::CaseInsensitiveOption);
+    QStringList parts = query.trimmed().split(andSplit, Qt::SkipEmptyParts);
+    for (auto &part : parts)
+        part = part.trimmed();
+    return parts;
 }
+
+int Backend::termState(const QString &term) const {
+    for (const QString &part : searchParts(m_query)) {
+        if (part.compare(term, Qt::CaseInsensitive) == 0)
+            return 1;
+        if (part.compare("not " + term, Qt::CaseInsensitive) == 0)
+            return 2;
+    }
+    return 0;
+}
+
+static bool hasOr(const QString &query) {
+    return query.contains(QRegularExpression(R"(\s+or\s+)", QRegularExpression::CaseInsensitiveOption));
+}
+
+// `wanted` is the clause to end up with ("@x" or "not @x"); `opposite` is the clause it replaces.
+static QString toggledQuery(const QString &query, const QString &wanted, const QString &opposite) {
+    QStringList parts = searchParts(query);
+    if (!parts.isEmpty() && hasOr(query))
+        parts.clear(); // an "or" search can't take an extra "and" safely, so start fresh
+    for (int i = parts.size() - 1; i >= 0; --i)
+        if (parts[i].compare(wanted, Qt::CaseInsensitive) == 0) {
+            parts.removeAt(i);
+            return parts.join(" and ");
+        }
+    for (auto &part : parts)
+        if (part.compare(opposite, Qt::CaseInsensitive) == 0) {
+            part = wanted;
+            return parts.join(" and ");
+        }
+    parts << wanted;
+    return parts.join(" and ");
+}
+
+void Backend::include(const QString &term) { search(toggledQuery(m_query, term, "not " + term)); }
+void Backend::exclude(const QString &term) { search(toggledQuery(m_query, "not " + term, term)); }
 
 void Backend::showProject(int block) {
     if (!m_query.isEmpty()) {

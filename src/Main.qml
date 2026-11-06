@@ -187,7 +187,9 @@ ApplicationWindow {
                         id: row
                         required property var modelData
                         readonly property bool header: modelData.kind === "header"
-                        readonly property bool current: modelData.kind === "project" ? backend.zoomBlock === modelData.block && backend.query === ""
+                        // 1 when the search includes this tag, 2 when it filters it out (read the query so this updates)
+                        readonly property int termState: { backend.query; return modelData.kind === "tag" ? backend.termState(modelData.query) : 0 }
+                        readonly property bool current: termState === 1 ? true : termState === 2 ? false : modelData.kind === "project" ? backend.zoomBlock === modelData.block && backend.query === ""
                                                        : modelData.kind === "all" ? backend.zoomBlock < 0 && backend.query === ""
                                                        : modelData.kind === "header" ? false
                                                        : backend.zoomBlock < 0 && backend.query === modelData.query
@@ -211,7 +213,8 @@ ApplicationWindow {
                             font.family: backend.fontFamily
                             font.pointSize: win.fs - (row.header ? 2 : 0.75)
                             font.bold: row.header
-                            color: row.header ? theme.muted : theme.foreground
+                            font.strikeout: row.termState === 2
+                            color: row.header || row.termState === 2 ? theme.muted : theme.foreground
                         }
                         // Tags that have values fold, with the same arrow as the editor.
                         Text {
@@ -228,10 +231,16 @@ ApplicationWindow {
                             TapHandler { onTapped: backend.toggleTagFold(row.modelData.name) }
                         }
                         HoverHandler { id: hover }
-                        // Ctrl+click on a tag (or one of its values) filters it out instead of searching for it.
+                        // Ctrl+click adds a tag (or one of its values) to the search; Ctrl+Shift+click filters it out.
                         TapHandler {
                             acceptedButtons: Qt.LeftButton
                             acceptedModifiers: Qt.ControlModifier
+                            enabled: row.modelData.kind === "tag"
+                            onTapped: backend.include(row.modelData.query)
+                        }
+                        TapHandler {
+                            acceptedButtons: Qt.LeftButton
+                            acceptedModifiers: Qt.ControlModifier | Qt.ShiftModifier
                             enabled: row.modelData.kind === "tag"
                             onTapped: backend.exclude(row.modelData.query)
                         }
@@ -353,16 +362,24 @@ ApplicationWindow {
                             onPressedChanged: if (pressed) editor.ctrlBase = editor.cursorPosition
                             onTapped: eventPoint => {
                                 const clicked = editor.positionAt(eventPoint.position.x, eventPoint.position.y)
-                                // Ctrl+click on a tag filters it out, as in the sidebar.
+                                // Ctrl+click on a tag adds it to the search, as in the sidebar.
                                 const tag = backend.tagAt(clicked)
                                 if (tag !== "") {
-                                    backend.exclude(tag)
+                                    backend.include(tag)
                                     return
                                 }
                                 // The caret that was there stays as an extra; the click becomes the main caret.
                                 const base = editor.ctrlBase === clicked ? editor.previousPos : editor.ctrlBase
                                 backend.addCursor(base, clicked)
                                 editor.cursorPosition = clicked
+                            }
+                        }
+                        // Ctrl+Shift+click on a tag filters it out of the search.
+                        TapHandler {
+                            acceptedModifiers: Qt.ControlModifier | Qt.ShiftModifier
+                            onTapped: eventPoint => {
+                                const tag = backend.tagAt(editor.positionAt(eventPoint.position.x, eventPoint.position.y))
+                                if (tag !== "") backend.exclude(tag)
                             }
                         }
                         Keys.onPressed: event => {
@@ -704,7 +721,8 @@ ApplicationWindow {
                         [qsTr("Find next / previous"), "Ctrl+G / Ctrl+Shift+G"],
                         [qsTr("Filter (search bar)"), "Ctrl+Shift+F"],
                         [qsTr("Save search"), "Ctrl+Shift+E"],
-                        [qsTr("Filter a tag out (sidebar)"), "Ctrl+click"],
+                        [qsTr("Add a tag to the search"), "Ctrl+click"],
+                        [qsTr("Filter a tag out"), "Ctrl+Shift+click"],
                         [qsTr("Toggle sidebar"), "Ctrl+B"],
                         [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
                         [qsTr("Open / Save / Save As"), "Ctrl+O / S / Shift+S"],
