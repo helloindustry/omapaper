@@ -474,13 +474,14 @@ bool Backend::newline(int position) {
         return false;
     QTextCursor c(m_doc);
     c.beginEditBlock();
+    c.setPosition(position);
     if (item.type == Item::Task && item.title.isEmpty() && item.tags.isEmpty()) {
-        // Enter on an empty task ends the list.
+        // Enter on an empty task ends the list, and still adds the line the key asked for,
+        // so repeated Enters keep making room instead of undoing the dash.
         c.setPosition(b.position() + item.bodyStart);
         c.setPosition(b.position() + b.length() - 1, QTextCursor::KeepAnchor);
-        c.removeSelectedText();
+        c.insertText("\n" + QString(item.level, '\t'));
     } else {
-        c.setPosition(position);
         c.insertText("\n" + QString(item.level, '\t') + (item.type == Item::Task ? "- " : ""));
     }
     c.endEditBlock();
