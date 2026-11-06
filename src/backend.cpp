@@ -172,7 +172,7 @@ bool Backend::renderPdf(const QString &path) const {
             html += "<div>&nbsp;</div>";
             continue;
         }
-        QString line = QString("&nbsp;").repeated(item.level * 4); // margin-left is ignored by Qt's rich text here
+        QString line = QString("&nbsp;").repeated(item.level * 2); // margin-left is ignored by Qt's rich text here
         int pos = item.bodyStart;
         for (const auto &tag : item.tags) {
             line += text.mid(pos, tag.start - pos).toHtmlEscaped();

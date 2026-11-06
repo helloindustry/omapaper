@@ -289,7 +289,8 @@ ApplicationWindow {
                         rightPadding: 24
                         topPadding: 16
                         bottomPadding: 16
-                        tabStopDistance: fontMetrics.advanceWidth(" ") * 4
+                        // A property read, so the width follows the font size when it changes (a method call would not be re-evaluated).
+                        tabStopDistance: fontMetrics.averageCharacterWidth * 2
                         persistentSelection: true
                         placeholderText: qsTr("Start typing. “- ” makes a task, a line ending in “:” makes a project, and “@tag” tags it.")
                         placeholderTextColor: theme.muted
