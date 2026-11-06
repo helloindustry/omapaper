@@ -101,6 +101,7 @@ private:
     QPair<int, int> blockRange(int start, int end) const;
     int subtreeEnd(int block) const;
     bool hasChildren(int block) const;
+    int foldEnd(int block) const; // end of the lines indented beneath an item
     int foldIndex(int block) const;
 
     Theme *m_theme;

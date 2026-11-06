@@ -346,7 +346,7 @@ void Backend::refresh() {
     const int n = items.size();
 
     // Parent and end of each item's subtree; blank lines belong to whatever surrounds them.
-    QVector<int> parent(n, -1), end(n, n), stack;
+    QVector<int> parent(n, -1), end(n, n), foldEnds(n, n), stack, strict;
     for (int i = 0; i < n; ++i) {
         if (items[i].type == Item::Blank)
             continue;
@@ -354,6 +354,10 @@ void Backend::refresh() {
             end[stack.takeLast()] = i;
         parent[i] = stack.isEmpty() ? -1 : stack.last();
         stack.append(i);
+        // Folding follows indentation only, so an item folds just the lines indented beneath it.
+        while (!strict.isEmpty() && items[strict.last()].level >= items[i].level)
+            foldEnds[strict.takeLast()] = i;
+        strict.append(i);
     }
 
     // The Searches project holds saved searches; it is not a project or a result.
@@ -388,8 +392,8 @@ void Backend::refresh() {
     auto parent_has_children = [&](int i) {
         if (items[i].type == Item::Blank)
             return false;
-        for (int j = i + 1; j < end[i]; ++j)
-            if (items[j].type != Item::Blank && items[j].level > items[i].level)
+        for (int j = i + 1; j < foldEnds[i]; ++j)
+            if (items[j].type != Item::Blank)
                 return true;
         return false;
     };
@@ -399,7 +403,7 @@ void Backend::refresh() {
             m_folds.removeAt(f);
             continue;
         }
-        for (int j = b + 1; j < end[b]; ++j)
+        for (int j = b + 1; j < foldEnds[b]; ++j)
             visible[j] = false;
     }
     if (!m_pin.isNull() && m_pin.blockNumber() < n)
@@ -530,14 +534,21 @@ bool Backend::hasChildren(int block) const {
         return false;
     for (QTextBlock next = b.next(); next.isValid(); next = next.next()) {
         const Item other = parseLine(next.text());
-        if (other.type == Item::Blank)
-            continue;
-        if (endsSubtree(item, other))
-            return false;
-        if (other.level > item.level)
-            return true;
+        if (other.type != Item::Blank)
+            return other.level > item.level;
     }
     return false;
+}
+
+int Backend::foldEnd(int block) const {
+    const int level = parseLine(m_doc->findBlockByNumber(block).text()).level;
+    int i = block + 1;
+    for (QTextBlock b = m_doc->findBlockByNumber(i); b.isValid(); b = b.next(), ++i) {
+        const Item item = parseLine(b.text());
+        if (item.type != Item::Blank && item.level <= level)
+            break;
+    }
+    return i;
 }
 
 int Backend::foldIndex(int block) const {
@@ -573,7 +584,7 @@ void Backend::foldItems(int start, int end, bool collapse, bool completely) {
     for (int i = range.first; i <= range.second; ++i) {
         QList<int> targets{i};
         if (completely)
-            for (int j = i + 1; j < subtreeEnd(i); ++j)
+            for (int j = i + 1; j < foldEnd(i); ++j)
                 targets << j;
         for (int t : targets) {
             if (!hasChildren(t))
