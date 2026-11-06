@@ -124,8 +124,8 @@ ApplicationWindow {
 
     // Keys follow TaskPaper with Ctrl in place of Command. Omarchy owns Super, so nothing here uses it,
     // and the single-letter keys of Omarchy's own apps (Q, ?) would type into the document, so they are Ctrl+Q and Ctrl+/.
-    // TaskPaper's keys, with Ctrl for Command and Alt for Option. Where the original's key is not documented
-    // (focus, move, sidebar) the closest Ctrl+Alt form is used; Omarchy's own bindings all use Super.
+    // Every key is Ctrl+key or Ctrl+Shift+key: TaskPaper's where known, otherwise the nearest free one.
+    // Omarchy's own bindings all use Super, so none of these collide with it.
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
@@ -138,24 +138,22 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+G"; context: Qt.ApplicationShortcut; onActivated: win.findAgain(false) }
     Shortcut { sequence: "Ctrl+Shift+G"; context: Qt.ApplicationShortcut; onActivated: win.findAgain(true) }
     Shortcut { sequence: "Ctrl+Shift+F"; context: Qt.ApplicationShortcut; onActivated: { win.searchOpen = true; search.forceActiveFocus(); search.selectAll() } }
-    Shortcut { sequence: "Ctrl+Alt+F"; context: Qt.ApplicationShortcut; onActivated: backend.saveSearch() }
-    Shortcut { sequences: ["Ctrl+Alt+S", "Ctrl+B"]; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
+    Shortcut { sequence: "Ctrl+Shift+E"; context: Qt.ApplicationShortcut; onActivated: backend.saveSearch() }
+    Shortcut { sequence: "Ctrl+B"; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
     Shortcut { sequences: ["Ctrl+D", "Ctrl+Return", "Ctrl+Enter"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+K"; context: Qt.ApplicationShortcut; onActivated: backend.deleteLines(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false) }
     Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(0) }
-    Shortcut { sequence: "Ctrl+Alt+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, true, true) }
-    Shortcut { sequence: "Ctrl+Alt+0"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, false, true) }
     Shortcut { sequences: ["Ctrl+Shift+9", "Ctrl+("]; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(true) }
     Shortcut { sequences: ["Ctrl+Shift+0", "Ctrl+)"]; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(false) }
     Shortcut { sequence: "Ctrl+."; context: Qt.ApplicationShortcut; onActivated: backend.toggleFold(editor.cursorPosition) }
-    Shortcut { sequences: ["Ctrl+]", "Ctrl+Alt+Right"]; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, 1) }
-    Shortcut { sequences: ["Ctrl+[", "Ctrl+Alt+Left"]; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, -1) }
-    Shortcut { sequence: "Ctrl+Alt+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
-    Shortcut { sequence: "Ctrl+Alt+Down"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, 1) }
-    Shortcut { sequence: "Ctrl+Alt+]"; context: Qt.ApplicationShortcut; onActivated: backend.zoomIn(editor.cursorPosition) }
-    Shortcut { sequence: "Ctrl+Alt+["; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
+    Shortcut { sequence: "Ctrl+]"; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, 1) }
+    Shortcut { sequence: "Ctrl+["; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, -1) }
+    Shortcut { sequence: "Ctrl+Shift+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
+    Shortcut { sequence: "Ctrl+Shift+Down"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, 1) }
+    Shortcut { sequence: "Ctrl+Shift+I"; context: Qt.ApplicationShortcut; onActivated: backend.zoomIn(editor.cursorPosition) }
+    Shortcut { sequence: "Ctrl+Shift+O"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
     Shortcut { sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
 
     Item {
@@ -248,30 +246,6 @@ ApplicationWindow {
                             MenuItem { text: qsTr("Delete Search"); onTriggered: backend.deleteBlock(row.modelData.block) }
                         }
                     }
-                }
-            }
-
-            // Drag to resize the sidebar, drag it nearly shut to collapse it, double-click to toggle it.
-            Item {
-                Layout.preferredWidth: 6
-                Layout.fillHeight: true
-                HoverHandler { cursorShape: Qt.SplitHCursor } // the resize cursor tells you the edge can be dragged
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.SplitHCursor
-                    onPositionChanged: mouse => {
-                        if (!pressed)
-                            return
-                        const x = mapToItem(content, mouse.x, 0).x
-                        if (x < 100) {
-                            win.sidebarVisible = false
-                        } else {
-                            win.sidebarVisible = true
-                            backend.sidebarWidth = Math.max(140, Math.min(x, win.width * 0.6))
-                        }
-                    }
-                    onReleased: backend.saveSidebarWidth()
-                    onDoubleClicked: { win.fitSidebar(); backend.saveSidebarWidth() }
                 }
             }
 
@@ -585,6 +559,34 @@ ApplicationWindow {
             onPressed: mouse => { win.closeFind(); mouse.accepted = false }
         }
 
+        // Drag the sidebar's edge to resize it, drag it nearly shut to collapse it, double-click to fit it to its text.
+        // It straddles the edge and sits above everything, so the scroll bar and the editor can't take the press.
+        Item {
+            x: (win.sidebarVisible ? backend.sidebarWidth : 0) - 6
+            width: 12
+            height: parent.height
+            z: 100
+            HoverHandler { cursorShape: Qt.SplitHCursor }
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.SplitHCursor
+                preventStealing: true
+                onPositionChanged: mouse => {
+                    if (!pressed)
+                        return
+                    const x = mapToItem(content, mouse.x, 0).x
+                    if (x < 100) {
+                        win.sidebarVisible = false
+                    } else {
+                        win.sidebarVisible = true
+                        backend.sidebarWidth = Math.max(140, Math.min(x, win.width * 0.6))
+                    }
+                }
+                onReleased: backend.saveSidebarWidth()
+                onDoubleClicked: { win.fitSidebar(); backend.saveSidebarWidth() }
+            }
+        }
+
         // Find and replace, in the top right corner.
         Rectangle {
             id: findPanel
@@ -665,17 +667,16 @@ ApplicationWindow {
                         [qsTr("Archive done items / selection"), "Ctrl+Shift+A"],
                         [qsTr("Delete line"), "Ctrl+Shift+K"],
                         [qsTr("Collapse item (Ctrl+. toggles)"), "Ctrl+9"],
-                        [qsTr("Collapse / expand completely"), "Ctrl+Alt+9 / 0"],
                         [qsTr("Collapse / expand all"), "Ctrl+Shift+9 / 0"],
                         [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
-                        [qsTr("Move up / down"), "Ctrl+Alt+Up / Down"],
-                        [qsTr("Focus in / out"), "Ctrl+Alt+] / ["],
+                        [qsTr("Move up / down"), "Ctrl+Shift+Up / Down"],
+                        [qsTr("Focus in / out"), "Ctrl+Shift+I / O"],
                         [qsTr("Home (whole document)"), "Ctrl+H"],
                         [qsTr("Find and replace"), "Ctrl+F"],
                         [qsTr("Find next / previous"), "Ctrl+G / Ctrl+Shift+G"],
                         [qsTr("Filter (search bar)"), "Ctrl+Shift+F"],
-                        [qsTr("Save search"), "Ctrl+Alt+F"],
-                        [qsTr("Toggle sidebar"), "Ctrl+Alt+S"],
+                        [qsTr("Save search"), "Ctrl+Shift+E"],
+                        [qsTr("Toggle sidebar"), "Ctrl+B"],
                         [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
                         [qsTr("Open / Save / Save As"), "Ctrl+O / S / Shift+S"],
                         [qsTr("Print"), "Ctrl+P"],

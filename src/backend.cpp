@@ -1144,7 +1144,14 @@ void Backend::archive(int start, int end) {
 // Moves the selected lines, with their children, past the neighbouring item at the same level.
 void Backend::moveLines(int start, int end, int direction) {
     const auto range = blockRange(start, end);
-    const int first = range.first, last = subtreeEnd(range.second); // [first, last)
+    // Blank lines after an item stay where they are; they are spacing, not part of what moves.
+    auto trimmed = [&](int exclusiveEnd, int firstLine) {
+        while (exclusiveEnd > firstLine + 1 && parseLine(m_doc->findBlockByNumber(exclusiveEnd - 1).text()).type == Item::Blank)
+            --exclusiveEnd;
+        return exclusiveEnd;
+    };
+    const int first = range.first, fullEnd = subtreeEnd(range.second);
+    const int last = trimmed(fullEnd, first); // [first, last)
     const int level = parseLine(m_doc->findBlockByNumber(first).text()).indent;
     int otherFirst, otherLast;
     if (direction < 0) {
@@ -1158,12 +1165,13 @@ void Backend::moveLines(int start, int end, int direction) {
         if (otherFirst < 0) return;
         otherLast = first;
     } else {
-        otherFirst = last;
-        if (!m_doc->findBlockByNumber(otherFirst).isValid()
-            || parseLine(m_doc->findBlockByNumber(otherFirst).text()).indent != level
-            || parseLine(m_doc->findBlockByNumber(otherFirst).text()).type == Item::Blank)
+        const int sibling = fullEnd;
+        if (!m_doc->findBlockByNumber(sibling).isValid()
+            || parseLine(m_doc->findBlockByNumber(sibling).text()).indent != level
+            || parseLine(m_doc->findBlockByNumber(sibling).text()).type == Item::Blank)
             return;
-        otherLast = subtreeEnd(otherFirst);
+        otherFirst = last; // the blank lines between the two travel with the sibling
+        otherLast = trimmed(subtreeEnd(sibling), sibling);
     }
     const int a = qMin(first, otherFirst), b = qMax(last, otherLast); // the two chunks span [a, b)
     auto text = [&](int from, int to) {
