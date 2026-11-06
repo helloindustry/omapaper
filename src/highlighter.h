@@ -9,10 +9,13 @@ class Highlighter : public QSyntaxHighlighter {
 public:
     explicit Highlighter(QTextDocument *document) : QSyntaxHighlighter(document) {}
     void setColors(const QColor &accent, const QColor &muted);
+    // Underlines the characters [start, end) of the document while the pointer is over a tag or link; an empty span clears it.
+    void setHover(int start, int end);
 
 protected:
     void highlightBlock(const QString &text) override;
 
 private:
+    int m_hoverStart = -1, m_hoverEnd = -1;
     QColor m_accent = "#FFD60A", m_muted = "#888888";
 };

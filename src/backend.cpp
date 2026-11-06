@@ -1030,6 +1030,39 @@ QString Backend::linkAt(int position) const {
     return {};
 }
 
+void Backend::setHover(int start, int end) {
+    if (!m_highlighter)
+        return;
+    // Restyling a line is not an edit, so it must not mark the document changed or save it.
+    const bool applying = m_applying;
+    m_applying = true;
+    m_highlighter->setHover(start, end);
+    m_applying = applying;
+}
+
+// Where a tag or link sits in the document, so the editor can tell a click on it from a click in the blank space after it.
+QVariantList Backend::tagSpan(int position) const {
+    if (!m_doc || position < 0)
+        return {};
+    const QTextBlock b = m_doc->findBlock(position);
+    const int column = position - b.position();
+    for (const auto &tag : parseLine(b.text()).tags)
+        if (column >= tag.start && column <= tag.start + tag.length)
+            return {b.position() + tag.start, b.position() + tag.start + tag.length};
+    return {};
+}
+
+QVariantList Backend::linkSpan(int position) const {
+    if (!m_doc || position < 0)
+        return {};
+    const QTextBlock b = m_doc->findBlock(position);
+    const int column = position - b.position();
+    for (const auto &link : findLinks(b.text()))
+        if (column >= link.start && column <= link.start + link.length)
+            return {b.position() + link.start, b.position() + link.start + link.length};
+    return {};
+}
+
 // Enter continues a list: a new task under a task, the same indent otherwise.
 bool Backend::newline(int position) {
     const QTextBlock b = m_doc->findBlock(position);

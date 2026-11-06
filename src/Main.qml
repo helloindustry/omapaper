@@ -363,7 +363,7 @@ ApplicationWindow {
                             onTapped: eventPoint => {
                                 const clicked = editor.positionAt(eventPoint.position.x, eventPoint.position.y)
                                 // Ctrl+click on a tag adds it to the search, as in the sidebar.
-                                const tag = backend.tagAt(clicked)
+                                const tag = editor.tagAtPoint(eventPoint.position.x, eventPoint.position.y)
                                 if (tag !== "") {
                                     backend.include(tag)
                                     return
@@ -378,7 +378,7 @@ ApplicationWindow {
                         TapHandler {
                             acceptedModifiers: Qt.ControlModifier | Qt.ShiftModifier
                             onTapped: eventPoint => {
-                                const tag = backend.tagAt(editor.positionAt(eventPoint.position.x, eventPoint.position.y))
+                                const tag = editor.tagAtPoint(eventPoint.position.x, eventPoint.position.y)
                                 if (tag !== "") backend.exclude(tag)
                             }
                         }
@@ -480,26 +480,54 @@ ApplicationWindow {
                             }
                         }
 
+                        // positionAt snaps to the nearest character, so a click in the blank space after a line would
+                        // count as a click on its last tag. A point only counts when it is inside the span's own box.
+                        function inSpan(span, x, y) {
+                            if (span.length === 0)
+                                return false
+                            const a = positionToRectangle(span[0]), b = positionToRectangle(span[1])
+                            if (y < a.y || y >= b.y + b.height)
+                                return false
+                            if (a.y === b.y)
+                                return x >= a.x && x < b.x
+                            return y < a.y + a.height ? x >= a.x : y >= b.y ? x < b.x : true
+                        }
+                        function tagAtPoint(x, y) {
+                            const at = positionAt(x, y)
+                            return inSpan(backend.tagSpan(at), x, y) ? backend.tagAt(at) : ""
+                        }
+                        function linkAtPoint(x, y) {
+                            const at = positionAt(x, y)
+                            return inSpan(backend.linkSpan(at), x, y) ? backend.linkAt(at) : ""
+                        }
+
                         // Links open on a click, and tags search for themselves like the sidebar's; both show a pointing hand.
                         property bool overLink: false
                         HoverHandler {
                             onPointChanged: {
-                                const at = editor.positionAt(point.position.x, point.position.y)
-                                editor.overLink = backend.linkAt(at) !== "" || backend.tagAt(at) !== ""
+                                const x = point.position.x, y = point.position.y
+                                const at = editor.positionAt(x, y)
+                                let span = backend.linkSpan(at)
+                                if (!editor.inSpan(span, x, y))
+                                    span = backend.tagSpan(at)
+                                const over = editor.inSpan(span, x, y)
+                                editor.overLink = over
+                                if (over) backend.setHover(span[0], span[1])
+                                else backend.setHover(-1, -1)
                             }
+                            onHoveredChanged: if (!hovered) { editor.overLink = false; backend.setHover(-1, -1) }
                         }
                         HoverHandler { enabled: editor.overLink; cursorShape: Qt.PointingHandCursor }
                         TapHandler {
                             acceptedModifiers: Qt.NoModifier
                             onTapped: eventPoint => {
                                 backend.clearCursors()
-                                const at = editor.positionAt(eventPoint.position.x, eventPoint.position.y)
-                                const url = backend.linkAt(at)
+                                const url = editor.linkAtPoint(eventPoint.position.x, eventPoint.position.y)
                                 if (url !== "") {
                                     Qt.openUrlExternally(url)
                                     return
                                 }
-                                const tag = backend.tagAt(at)
+                                const tag = editor.tagAtPoint(eventPoint.position.x, eventPoint.position.y)
                                 if (tag !== "") backend.search(tag)
                             }
                         }
