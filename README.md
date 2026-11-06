@@ -45,7 +45,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+/ | Show all keys |
 | Ctrl+Q | Quit |
 
-Keys follow TaskPaper with Ctrl for Command and Alt for Option. Reopening a file puts the cursor back where you left it.
+Keys follow TaskPaper with Ctrl for Command and Alt for Option. Reopening a file puts the cursor back where you left it and restores which items were folded.
 
 Omarchy's single-key `?` and `Q` would type into a document, so help and quit take Ctrl.
 

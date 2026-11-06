@@ -128,14 +128,27 @@ void Backend::load(const QString &path) {
     m_cursor = qBound(0, remembered, qMax(0, m_doc->characterCount() - 1));
     m_zoomed = false;
     m_folds.clear();
+    const QString foldKey = "folds/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding));
+    for (const QString &number : QSettings("taskpaper", "taskpaper").value(foldKey).toString().split(',', Qt::SkipEmptyParts)) {
+        const int block = number.toInt();
+        if (block < m_doc->blockCount() && foldIndex(block) < 0 && hasChildren(block))
+            m_folds.append(QTextCursor(m_doc->findBlockByNumber(block)));
+    }
     m_pin = QTextCursor();
     QSettings("taskpaper", "taskpaper").setValue("lastFile", path);
     setError({});
     emit fileChanged();
     emit zoomChanged();
     refresh();
+    // A caret inside a folded item would be on a hidden line; park it on the visible line above.
+    QTextBlock at = m_doc->findBlock(m_cursor);
+    while (at.isValid() && !at.isVisible() && at.previous().isValid())
+        at = at.previous();
+    if (at.isValid() && !at.isVisible())
+        at = m_doc->begin();
     if (m_cursor > 0)
-        emit cursorRequested(m_cursor);
+        emit cursorRequested(at.isVisible() && at.blockNumber() == m_doc->findBlock(m_cursor).blockNumber()
+                                 ? m_cursor : at.position() + at.length() - 1);
 }
 
 void Backend::openPath(const QString &path) {
@@ -223,8 +236,16 @@ void Backend::rememberCursor(int position) { m_cursor = position; }
 
 // The caret position is kept per file, so reopening puts you back where you stopped.
 void Backend::persistCursor() {
-    if (!m_path.isEmpty() && m_doc)
-        QSettings("taskpaper", "taskpaper").setValue("cursor/" + QString::fromLatin1(m_path.toUtf8().toBase64(QByteArray::Base64UrlEncoding)), m_cursor);
+    if (m_path.isEmpty() || !m_doc)
+        return;
+    QSettings settings("taskpaper", "taskpaper");
+    const QString key = QString::fromLatin1(m_path.toUtf8().toBase64(QByteArray::Base64UrlEncoding));
+    settings.setValue("cursor/" + key, m_cursor);
+    // Which items are folded, as line numbers, so the outline reopens the way it was left.
+    QStringList folded;
+    for (const auto &fold : m_folds)
+        folded << QString::number(fold.blockNumber());
+    settings.setValue("folds/" + key, folded.join(','));
 }
 
 void Backend::save() {
@@ -534,6 +555,7 @@ void Backend::toggleFoldBlock(int block) {
     // Keep the caret on the folded line instead of inside the lines that just vanished.
     emit cursorRequested(m_doc->findBlockByNumber(block).position() + m_doc->findBlockByNumber(block).length() - 1);
     refresh();
+    persistCursor();
 }
 
 void Backend::toggleFold(int position) { toggleFoldBlock(m_doc->findBlock(position).blockNumber()); }
@@ -563,6 +585,7 @@ void Backend::foldItems(int start, int end, bool collapse, bool completely) {
         emit cursorRequested(b.position() + b.length() - 1);
     }
     refresh();
+    persistCursor();
 }
 
 void Backend::toggleFoldAll() { foldAll(m_folds.isEmpty()); }
@@ -575,6 +598,7 @@ void Backend::foldAll(bool collapse) {
                 m_folds.append(QTextCursor(b));
     emit cursorRequested(0);
     refresh();
+    persistCursor();
 }
 
 void Backend::zoomToBlock(int block) {
