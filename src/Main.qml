@@ -38,6 +38,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Alt+Left"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
     Shortcut { sequence: "Ctrl+Alt+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
     Shortcut { sequence: "Ctrl+Alt+Down"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, 1) }
+    Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequences: ["Ctrl+.", "Ctrl+Alt+Return"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleFold(editor.cursorPosition) }
     Shortcut { sequence: "Ctrl+Alt+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(true) }
     Shortcut { sequence: "Ctrl+Alt+0"; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(false) }
@@ -291,6 +292,7 @@ ApplicationWindow {
                         [qsTr("Toggle done"), "Ctrl+Enter / Ctrl+D"],
                         [qsTr("Fold / unfold"), "Ctrl+."],
                         [qsTr("Fold all / unfold all"), "Ctrl+Alt+9 / 0"],
+                        [qsTr("Archive selection (or all done)"), "Ctrl+Shift+A"],
                         [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
                         [qsTr("Move up / down"), "Ctrl+Alt+Up / Down"],
                         [qsTr("Zoom in / out"), "Ctrl+Alt+Right / Left"],

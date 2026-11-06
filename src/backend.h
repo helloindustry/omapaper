@@ -60,6 +60,7 @@ public:
     Q_INVOKABLE bool newline(int position);
     Q_INVOKABLE void indent(int start, int end, int direction);
     Q_INVOKABLE void toggleDone(int start, int end);
+    Q_INVOKABLE void archive(int start, int end); // the selection, or every @done item when nothing is selected
     Q_INVOKABLE void moveLines(int start, int end, int direction);
 
 signals:

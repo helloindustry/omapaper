@@ -611,6 +611,103 @@ void Backend::toggleDone(int start, int end) {
     c.endEditBlock();
 }
 
+// Moves items under an "Archive:" project at the bottom of the file, the way TaskPaper does: they go in at
+// the top of the project, keep their children, tags and @done, and gain @project(Parent / Child) naming
+// where they came from. With nothing selected it archives every @done item, as TaskPaper's command does.
+void Backend::archive(int start, int end) {
+    if (!m_doc)
+        return;
+    const int count = m_doc->blockCount();
+    QVector<Item> items;
+    for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next())
+        items.append(parseLine(b.text()));
+
+    int archiveBlock = -1, archiveEnd = -1;
+    for (int i = 0; i < count && archiveBlock < 0; ++i)
+        if (items[i].type == Item::Project && items[i].level == 0 && items[i].title == "Archive") {
+            archiveBlock = i;
+            archiveEnd = subtreeEnd(i);
+        }
+
+    // Which items to move: tops of subtrees only, never anything already archived.
+    QList<QPair<int, int>> chunks; // [first, last] lines
+    int skipUntil = 0;
+    int first = 0, last = count - 1;
+    const bool selection = end > start;
+    if (selection) {
+        const auto range = blockRange(start, end);
+        first = range.first;
+        last = range.second;
+    }
+    for (int i = first; i <= last; ++i) {
+        if (i < skipUntil || items[i].type == Item::Blank || (archiveBlock >= 0 && i >= archiveBlock && i < archiveEnd))
+            continue;
+        if (!selection && !items[i].hasTag("done"))
+            continue;
+        int stop = subtreeEnd(i);
+        while (stop > i + 1 && items[stop - 1].type == Item::Blank)
+            --stop; // trailing blank lines stay behind
+        chunks.append({i, stop - 1});
+        skipUntil = stop;
+    }
+    if (chunks.isEmpty())
+        return;
+
+    // Build the moved text first: one level in, with @project(...) on each item's top line.
+    QStringList moved;
+    for (const auto &chunk : chunks) {
+        const Item &top = items[chunk.first];
+        QStringList path;
+        for (int p = parentBlock(chunk.first); p >= 0; p = parentBlock(p))
+            if (items[p].type == Item::Project)
+                path.prepend(items[p].title);
+        const int delta = 1 - top.level;
+        for (int j = chunk.first; j <= chunk.second; ++j) {
+            QString line = m_doc->findBlockByNumber(j).text();
+            if (delta > 0)
+                line.prepend(QString(delta, '\t'));
+            else if (delta < 0)
+                line.remove(0, qMin(-delta, items[j].level));
+            if (j == chunk.first && !path.isEmpty() && !top.hasTag("project"))
+                line += " @project(" + path.join(" / ") + ")";
+            moved << line;
+        }
+    }
+
+    QTextCursor c(m_doc);
+    c.beginEditBlock();
+    for (int k = chunks.size() - 1; k >= 0; --k) { // from the bottom, so earlier line numbers stay valid
+        const QTextBlock from = m_doc->findBlockByNumber(chunks[k].first), to = m_doc->findBlockByNumber(chunks[k].second);
+        if (to.next().isValid()) {
+            c.setPosition(from.position());
+            c.setPosition(to.next().position(), QTextCursor::KeepAnchor);
+        } else {
+            // The last line has no newline after it, so take the one before it.
+            c.setPosition(from.position() > 0 ? from.position() - 1 : 0);
+            c.setPosition(to.position() + to.length() - 1, QTextCursor::KeepAnchor);
+        }
+        c.removeSelectedText();
+    }
+
+    int at = -1;
+    for (QTextBlock b = m_doc->begin(); b.isValid() && at < 0; b = b.next()) {
+        const Item item = parseLine(b.text());
+        if (item.type == Item::Project && item.level == 0 && item.title == "Archive")
+            at = b.blockNumber();
+    }
+    if (at < 0) {
+        c.movePosition(QTextCursor::End);
+        if (!m_doc->lastBlock().text().isEmpty())
+            c.insertText("\n");
+        c.insertText("Archive:");
+        at = m_doc->lastBlock().blockNumber();
+    }
+    const QTextBlock archiveLine = m_doc->findBlockByNumber(at);
+    c.setPosition(archiveLine.position() + archiveLine.length() - 1);
+    c.insertText("\n" + moved.join("\n"));
+    c.endEditBlock();
+}
+
 // Moves the selected lines, with their children, past the neighbouring item at the same level.
 void Backend::moveLines(int start, int end, int direction) {
     const auto range = blockRange(start, end);

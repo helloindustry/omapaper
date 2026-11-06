@@ -28,6 +28,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+Enter or Ctrl+D | Toggle done (adds `@done(today)`) |
 | Ctrl+. | Fold / unfold the item |
 | Ctrl+Alt+9 / Ctrl+Alt+0 | Fold all / unfold all |
+| Ctrl+Shift+A | Archive the selection, or every `@done` item if nothing is selected |
 | Tab / Shift+Tab | Indent / outdent |
 | Ctrl+Alt+Up / Down | Move item with its children |
 | Ctrl+Alt+Right / Left | Zoom in / out |
