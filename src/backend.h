@@ -22,6 +22,7 @@ class Backend : public QObject {
     Q_PROPERTY(int zoomBlock READ zoomBlock NOTIFY zoomChanged)
     Q_PROPERTY(QString zoomPath READ zoomPath NOTIFY zoomChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
+    Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
 
 public:
     explicit Backend(Theme *theme, const QString &initialFile = {}, QObject *parent = nullptr);
@@ -36,6 +37,7 @@ public:
     int zoomBlock() const { return m_zoomed ? m_zoom.blockNumber() : -1; }
     QString zoomPath() const;
     QString error() const { return m_error; }
+    QString notice() const { return m_notice; }
 
     Q_INVOKABLE void attach(QQuickTextDocument *document);
     Q_INVOKABLE void openDialog();
@@ -43,6 +45,8 @@ public:
     Q_INVOKABLE void changeFontSize(double delta); // 0 resets to the default
     Q_INVOKABLE void openPath(const QString &path);
     Q_INVOKABLE void save();
+    Q_INVOKABLE void print(); // what is on screen, to the default printer
+    bool renderPdf(const QString &path) const;
     Q_INVOKABLE void rememberCursor(int position); // reopened files put the caret back here
 
     Q_INVOKABLE void search(const QString &query);   // from the sidebar: searches the whole document
@@ -76,6 +80,7 @@ signals:
     void sidebarChanged();
     void zoomChanged();
     void errorChanged();
+    void noticeChanged();
     void moved(int start, int end);
     void foldsChanged();
     void cursorRequested(int position);
@@ -99,7 +104,7 @@ private:
     int foldIndex(int block) const;
 
     Theme *m_theme;
-    QString m_initialFile, m_path, m_query, m_error;
+    QString m_initialFile, m_path, m_query, m_error, m_notice;
     QTextDocument *m_doc = nullptr;
     Highlighter *m_highlighter = nullptr;
     QTextCursor m_zoom, m_pin; // cursors, so they follow the lines as text is edited
@@ -109,5 +114,5 @@ private:
     bool m_zoomed = false, m_applying = false, m_dirty = false;
     QVariantList m_sidebar, m_foldMarks;
     QList<QTextCursor> m_folds; // fold points, as cursors so they follow the lines when text is edited
-    QTimer m_refresh, m_save;
+    QTimer m_refresh, m_save, m_noticeTimer;
 };

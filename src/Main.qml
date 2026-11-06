@@ -107,6 +107,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
+    Shortcut { sequence: "Ctrl+P"; context: Qt.ApplicationShortcut; onActivated: backend.print() }
     Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; onActivated: backend.save() }
     Shortcut { sequence: "Ctrl+Shift+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveAsDialog() }
     Shortcut { sequences: ["Ctrl+=", "Ctrl++"]; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(1) }
@@ -346,6 +347,22 @@ ApplicationWindow {
                 }
 
                 Rectangle {
+                    visible: backend.notice !== "" && backend.error === ""
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.round(win.fs * 2.8)
+                    color: theme.sidebar
+                    Text {
+                        anchors.fill: parent
+                        anchors.leftMargin: 16
+                        verticalAlignment: Text.AlignVCenter
+                        text: backend.notice
+                        font.family: backend.fontFamily
+                        font.pointSize: win.fs - 1.5
+                        color: theme.muted
+                    }
+                }
+
+                Rectangle {
                     visible: backend.error !== ""
                     Layout.fillWidth: true
                     Layout.preferredHeight: Math.round(win.fs * 2.8)
@@ -462,6 +479,7 @@ ApplicationWindow {
                         [qsTr("Toggle sidebar"), "Ctrl+Alt+S"],
                         [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
                         [qsTr("Open / Save / Save As"), "Ctrl+O / S / Shift+S"],
+                        [qsTr("Print"), "Ctrl+P"],
                         [qsTr("Undo / redo"), "Ctrl+Z / Ctrl+Shift+Z"],
                         [qsTr("This list"), "Ctrl+/"],
                         [qsTr("Quit"), "Ctrl+Q"]

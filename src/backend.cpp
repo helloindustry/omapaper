@@ -8,7 +8,12 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QPageSize>
+#include <QPdfWriter>
 #include <QProcess>
+#include <QStandardPaths>
+#include <QTemporaryFile>
+#include <QTextDocument>
 #include <QRegularExpression>
 #include <QRandomGenerator>
 #include <QSaveFile>
@@ -39,6 +44,9 @@ Backend::Backend(Theme *theme, const QString &initialFile, QObject *parent)
     m_save.setSingleShot(true);
     m_save.setInterval(800);
     connect(&m_save, &QTimer::timeout, this, &Backend::save);
+    m_noticeTimer.setSingleShot(true);
+    m_noticeTimer.setInterval(3000);
+    connect(&m_noticeTimer, &QTimer::timeout, this, [this] { m_notice.clear(); emit noticeChanged(); });
     connect(m_theme, &Theme::changed, this, &Backend::applyColors);
     m_defaultFontSize = omarchyFontSize();
     m_fontDelta = QSettings("taskpaper", "taskpaper").value("fontDelta", 0.0).toDouble();
@@ -136,6 +144,81 @@ void Backend::openPath(const QString &path) {
 }
 
 // Written beside the file and renamed, so a crash never leaves half a document.
+// Prints what you see, so a zoom, search, or fold decides what ends up on paper. The page is made as a PDF
+// and handed to CUPS, which is what Omarchy's printer setup configures.
+bool Backend::renderPdf(const QString &path) const {
+    if (!m_doc)
+        return false;
+    QString html = "<body style=\"color:black\">";
+    for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next()) {
+        if (!b.isVisible())
+            continue;
+        const QString text = b.text();
+        const Item item = parseLine(text);
+        if (item.type == Item::Blank) {
+            html += "<div>&nbsp;</div>";
+            continue;
+        }
+        QString line = QString("&nbsp;").repeated(item.level * 4); // margin-left is ignored by Qt's rich text here
+        int pos = item.bodyStart;
+        for (const auto &tag : item.tags) {
+            line += text.mid(pos, tag.start - pos).toHtmlEscaped();
+            line += "<span style=\"color:#666666\">" + text.mid(tag.start, tag.length).toHtmlEscaped() + "</span>";
+            pos = tag.start + tag.length;
+        }
+        line += text.mid(pos).toHtmlEscaped();
+        QString style;
+        if (item.type == Item::Project)
+            style = "font-weight:bold;";
+        else if (item.type == Item::Note)
+            style = "color:#555555;";
+        if (item.hasTag("done"))
+            style += "text-decoration:line-through;color:#777777;";
+        html += QString("<div style=\"white-space:pre-wrap;%1\">%2</div>").arg(style, line);
+    }
+    html += "</body>";
+
+    QTextDocument page;
+    page.setDefaultFont(QFont(fontFamily(), 10));
+    page.setDocumentMargin(0);
+    page.setHtml(html);
+    QPdfWriter pdf(path);
+    pdf.setTitle(title());
+    pdf.setPageSize(QPageSize(QLocale::system().measurementSystem() == QLocale::ImperialUSSystem ? QPageSize::Letter : QPageSize::A4));
+    pdf.setPageMargins(QMarginsF(18, 18, 18, 18), QPageLayout::Millimeter);
+    page.print(&pdf);
+    return QFileInfo(path).size() > 0;
+}
+
+void Backend::print() {
+    QTemporaryFile file(QDir::tempPath() + "/taskpaper-XXXXXX.pdf");
+    file.setAutoRemove(false);
+    if (!file.open() || (file.close(), !renderPdf(file.fileName()))) {
+        setError(tr("Can't prepare the page for printing"));
+        return;
+    }
+    const QString path = file.fileName();
+    auto *lp = new QProcess(this);
+    connect(lp, &QProcess::finished, this, [this, lp, path](int code, QProcess::ExitStatus) {
+        if (code == 0) {
+            m_notice = tr("Sent to the printer");
+            emit noticeChanged();
+            m_noticeTimer.start();
+        } else {
+            // lp says why: no printer set up, printer offline, and so on.
+            setError(tr("Can't print: %1").arg(QString::fromUtf8(lp->readAllStandardError()).trimmed()));
+        }
+        QFile::remove(path);
+        lp->deleteLater();
+    });
+    connect(lp, &QProcess::errorOccurred, this, [this, lp, path](QProcess::ProcessError) {
+        setError(tr("Can't print: the lp command is missing"));
+        QFile::remove(path);
+        lp->deleteLater();
+    });
+    lp->start("lp", {"-t", title(), path});
+}
+
 void Backend::rememberCursor(int position) { m_cursor = position; }
 
 // The caret position is kept per file, so reopening puts you back where you stopped.
