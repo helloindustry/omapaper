@@ -277,8 +277,6 @@ void Backend::refresh() {
             m_folds.removeAt(f);
             continue;
         }
-        if (m_zoomed && b == m_zoom.blockNumber())
-            continue; // zooming into a folded item shows what is inside it
         for (int j = b + 1; j < end[b]; ++j)
             visible[j] = false;
     }
@@ -484,6 +482,9 @@ void Backend::zoomToBlock(int block) {
         return;
     m_zoom = QTextCursor(m_doc->findBlockByNumber(block));
     m_zoomed = true;
+    // Zooming into a folded item shows what is inside it; folding it again while zoomed works as usual.
+    if (const int at = foldIndex(block); at >= 0)
+        m_folds.removeAt(at);
     m_pin = QTextCursor();
     refresh();
     const QTextBlock root = m_doc->findBlockByNumber(block);
