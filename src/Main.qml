@@ -105,7 +105,7 @@ ApplicationWindow {
     // TaskPaper's keys, with Ctrl for Command and Alt for Option. Where the original's key is not documented
     // (focus, move, sidebar) the closest Ctrl+Alt form is used; Omarchy's own bindings all use Super.
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
-    Shortcut { sequences: ["Ctrl+K", "Ctrl+/", "F1"]; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
+    Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
     Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; onActivated: backend.save() }
     Shortcut { sequence: "Ctrl+Shift+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveAsDialog() }
@@ -463,7 +463,7 @@ ApplicationWindow {
                         [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
                         [qsTr("Open / Save / Save As"), "Ctrl+O / S / Shift+S"],
                         [qsTr("Undo / redo"), "Ctrl+Z / Ctrl+Shift+Z"],
-                        [qsTr("This list"), "Ctrl+K"],
+                        [qsTr("This list"), "Ctrl+/"],
                         [qsTr("Quit"), "Ctrl+Q"]
                     ]
                     delegate: Item {

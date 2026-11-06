@@ -41,7 +41,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+Alt+S (or Ctrl+B) | Toggle sidebar |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text to Omarchy's size |
 | Ctrl+O / Ctrl+S / Ctrl+Shift+S | Open / Save now / Save As |
-| Ctrl+K | Show all keys |
+| Ctrl+/ | Show all keys |
 | Ctrl+Q | Quit |
 
 Keys follow TaskPaper with Ctrl for Command and Alt for Option. Reopening a file puts the cursor back where you left it.
