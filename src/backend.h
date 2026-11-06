@@ -53,7 +53,7 @@ public:
     Q_INVOKABLE void openPath(const QString &path);
     Q_INVOKABLE void save();
     Q_INVOKABLE void saveSidebarWidth();
-    Q_INVOKABLE QVariantList lineRange(int position) const; // [start, end) of the whole line, newline included
+    Q_INVOKABLE QVariantList lineRange(int position) const; // the line's own text
     Q_INVOKABLE void toggleTagFold(const QString &name);
     // More than one caret: Ctrl+click adds one, and typing then happens at every caret at once.
     Q_INVOKABLE void addCursor(int position, int primary);

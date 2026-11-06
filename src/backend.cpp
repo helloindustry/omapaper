@@ -235,7 +235,7 @@ void Backend::print() {
 
 QVariantList Backend::lineRange(int position) const {
     const QTextBlock b = m_doc->findBlock(position);
-    return {b.position(), b.next().isValid() ? b.next().position() : b.position() + b.length() - 1};
+    return {b.position(), b.position() + b.length() - 1}; // the line's text, up to but not into the next line
 }
 
 void Backend::saveSidebarWidth() { QSettings("taskpaper", "taskpaper").setValue("sidebarWidth", m_sidebarWidth); }
@@ -512,21 +512,24 @@ void Backend::refresh() {
             visible[root] = true;
     }
     // A fold hides an item's children. Folds whose item lost its children are dropped.
-    // Folding follows indentation alone. An item folds every line indented deeper than it: text lines always,
-    // blank lines only if they are themselves indented, so spacing between sections stays visible.
-    // The region ends at the first text line that is not indented deeper.
+    // The pinned line (the one just typed on) stays visible against a search, but never against a fold.
+    if (!m_pin.isNull() && m_pin.blockNumber() < n)
+        visible[m_pin.blockNumber()] = true;
+
+    // Folding rule: the lines directly beneath an item that are indented deeper belong to it and fold with it.
+    // The first line that is not indented deeper, empty lines included, ends them.
     auto foldRegionEnd = [&](int i) {
         int j = i + 1;
-        while (j < n && (items[j].type == Item::Blank || items[j].indent > items[i].indent))
+        while (j < n && items[j].indent > items[i].indent)
             ++j;
         return j;
     };
     auto parent_has_children = [&](int i) {
         if (items[i].type == Item::Blank)
             return false;
-        for (int j = i + 1; j < n; ++j)
+        for (int j = i + 1; j < foldRegionEnd(i); ++j)
             if (items[j].type != Item::Blank)
-                return items[j].indent > items[i].indent;
+                return true;
         return false;
     };
     for (int f = m_folds.size() - 1; f >= 0; --f) {
@@ -536,11 +539,8 @@ void Backend::refresh() {
             continue;
         }
         for (int j = b + 1; j < foldRegionEnd(b); ++j)
-            if (items[j].type != Item::Blank || items[j].indent > items[b].indent)
-                visible[j] = false;
+            visible[j] = false;
     }
-    if (!m_pin.isNull() && m_pin.blockNumber() < n)
-        visible[m_pin.blockNumber()] = true;
 
     m_applying = true;
     int i = 0, from = -1;
@@ -669,28 +669,22 @@ void Backend::showProject(int block) {
 
 void Backend::showAll() { search({}); }
 
-bool Backend::hasChildren(int block) const {
-    const QTextBlock b = m_doc->findBlockByNumber(block);
-    const Item item = parseLine(b.text());
-    if (item.type == Item::Blank)
-        return false;
-    for (QTextBlock next = b.next(); next.isValid(); next = next.next()) {
-        const Item other = parseLine(next.text());
-        if (other.type != Item::Blank)
-            return other.indent > item.indent;
-    }
-    return false;
-}
-
 int Backend::foldEnd(int block) const {
     const int indent = parseLine(m_doc->findBlockByNumber(block).text()).indent;
     int i = block + 1;
-    for (QTextBlock b = m_doc->findBlockByNumber(i); b.isValid(); b = b.next(), ++i) {
-        const Item item = parseLine(b.text());
-        if (item.type != Item::Blank && item.indent <= indent)
-            break;
-    }
+    for (QTextBlock b = m_doc->findBlockByNumber(i); b.isValid() && parseLine(b.text()).indent > indent; b = b.next())
+        ++i;
     return i;
+}
+
+bool Backend::hasChildren(int block) const {
+    const QTextBlock start = m_doc->findBlockByNumber(block);
+    if (parseLine(start.text()).type == Item::Blank)
+        return false;
+    for (int j = block + 1; j < foldEnd(block); ++j)
+        if (parseLine(m_doc->findBlockByNumber(j).text()).type != Item::Blank)
+            return true;
+    return false;
 }
 
 int Backend::foldIndex(int block) const {
@@ -926,14 +920,7 @@ bool Backend::newline(int position) {
     if (foldIndex(b.blockNumber()) >= 0 && column >= b.text().size()) {
         // Enter at the end of a folded item: it stays folded, and the new line goes after everything hidden
         // inside it, at the item's own level, which is the next line you would see.
-        int last = b.blockNumber();
-        for (int j = foldEnd(last) - 1; j > b.blockNumber(); --j) {
-            const Item inner = parseLine(m_doc->findBlockByNumber(j).text());
-            if (inner.type != Item::Blank || inner.indent > item.indent) {
-                last = j;
-                break;
-            }
-        }
+        const int last = foldEnd(b.blockNumber()) - 1; // everything hidden inside it ends here
         const QTextBlock tail = m_doc->findBlockByNumber(last);
         c.setPosition(tail.position() + tail.length() - 1);
         c.insertText("\n" + lead + (item.type == Item::Task ? "- " : ""));

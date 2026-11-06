@@ -69,6 +69,22 @@ ApplicationWindow {
         function onQueryChanged() { if (backend.query === "" && !search.activeFocus) win.searchOpen = false }
     }
 
+    // Double-clicking the edge sizes the sidebar to its longest line.
+    TextMetrics { id: rowMetrics; font.family: backend.fontFamily }
+    function fitSidebar() {
+        let widest = 0
+        for (const row of backend.sidebar) {
+            const header = row.kind === "header"
+            rowMetrics.font.pointSize = win.fs - (header ? 2 : 0.75)
+            rowMetrics.font.bold = header
+            rowMetrics.text = row.label
+            const x = (row.kind === "tag" ? 28 : 16) + (row.level || 0) * 14
+            widest = Math.max(widest, x + rowMetrics.advanceWidth + 24)
+        }
+        win.sidebarVisible = true
+        backend.sidebarWidth = Math.max(120, Math.min(Math.ceil(widest), win.width * 0.6))
+    }
+
     function openFind() {
         const selected = editor.selectedText
         if (selected !== "" && selected.indexOf("\n") < 0 && selected.indexOf("\u2029") < 0)
@@ -238,7 +254,7 @@ ApplicationWindow {
             Item {
                 Layout.preferredWidth: 6
                 Layout.fillHeight: true
-                Rectangle { anchors.horizontalCenter: parent.horizontalCenter; width: 1; height: parent.height; color: theme.selection; visible: win.sidebarVisible }
+                HoverHandler { cursorShape: Qt.SplitHCursor } // the resize cursor tells you the edge can be dragged
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.SplitHCursor
@@ -254,7 +270,7 @@ ApplicationWindow {
                         }
                     }
                     onReleased: backend.saveSidebarWidth()
-                    onDoubleClicked: win.sidebarVisible = !win.sidebarVisible
+                    onDoubleClicked: { win.fitSidebar(); backend.saveSidebarWidth() }
                 }
             }
 
@@ -411,6 +427,7 @@ ApplicationWindow {
 
                         // Triple-click selects the whole line, and dragging from that third press extends by whole lines.
                         property var lineAnchor: null
+                        property var lineSel: [0, 0]
                         property int clickCount: 0
                         property double lastPress: 0
                         property point lastPoint
@@ -429,9 +446,15 @@ ApplicationWindow {
                                         const r = backend.lineRange(editor.positionAt(p.x, p.y))
                                         editor.lineAnchor = r
                                         editor.selectByMouse = false // so the editor's own drag selection does not fight this one
+                                        editor.lineSel = [r[0], r[1]]
                                         editor.select(r[0], r[1])
                                     }
                                 } else {
+                                    // The editor collapses a selection when the button comes up; put the line selection back.
+                                    if (editor.lineAnchor !== null) {
+                                        const keep = editor.lineSel
+                                        Qt.callLater(() => editor.select(keep[0], keep[1]))
+                                    }
                                     editor.lineAnchor = null
                                     editor.selectByMouse = true
                                 }
@@ -441,8 +464,8 @@ ApplicationWindow {
                                     return
                                 const r = backend.lineRange(editor.positionAt(point.position.x, point.position.y))
                                 const a = editor.lineAnchor
-                                if (r[0] < a[0]) editor.select(a[1], r[0])
-                                else editor.select(a[0], Math.max(a[1], r[1]))
+                                editor.lineSel = r[0] < a[0] ? [a[1], r[0]] : [a[0], Math.max(a[1], r[1])]
+                                editor.select(editor.lineSel[0], editor.lineSel[1])
                             }
                         }
 
