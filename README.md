@@ -25,24 +25,27 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 
 | Key | Action |
 | --- | --- |
-| Ctrl+Enter or Ctrl+D | Toggle done (adds `@done(today)`) |
-| Ctrl+. | Fold / unfold the item |
-| Ctrl+, | Fold all / unfold all |
-| Ctrl+E | Archive the selection, or every `@done` item if nothing is selected |
-| Tab / Shift+Tab | Indent / outdent |
-| Ctrl+Up / Ctrl+Down | Move item with its children |
-| Ctrl+] / Ctrl+[ | Zoom in / out |
+| Ctrl+D (or Ctrl+Enter) | Toggle done (adds `@done(today)`) |
+| Ctrl+Shift+A | Archive the selection, or every `@done` item if nothing is selected |
+| Ctrl+9 / Ctrl+0 | Collapse / expand the item (Ctrl+. toggles it) |
+| Ctrl+Alt+9 / Ctrl+Alt+0 | Collapse / expand the item and everything inside it |
+| Ctrl+Shift+9 / Ctrl+Shift+0 | Collapse / expand everything |
+| Tab / Shift+Tab (or Ctrl+] / Ctrl+[) | Indent / outdent |
+| Ctrl+Alt+Up / Down | Move item with its children |
+| Ctrl+Alt+] / Ctrl+Alt+[ | Focus in / out (zoom) |
 | Ctrl+H | Home: the whole document |
-| Ctrl+F | Search |
-| Ctrl+G | Save current search |
-| Ctrl+B | Toggle sidebar |
-| Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text |
-| Ctrl+O | Open |
-| Ctrl+S / Ctrl+Shift+S | Save now / Save As |
+| Ctrl+F | Find and replace (top right; Enter = next, Shift+Enter = previous, Esc closes) |
+| Ctrl+G / Ctrl+Shift+G | Find next / previous |
+| Ctrl+Shift+F | Filter with the search bar |
+| Ctrl+Alt+F | Save the current search |
+| Ctrl+Alt+S (or Ctrl+B) | Toggle sidebar |
+| Ctrl+= / Ctrl+- | Bigger / smaller text |
+| Ctrl+O / Ctrl+S / Ctrl+Shift+S | Open / Save now / Save As |
 | Ctrl+K | Show all keys |
 | Ctrl+Q | Quit |
 
-Omarchy's own shortcuts all use Super, so Ctrl-only keys never collide with them.
+Keys follow TaskPaper with Ctrl for Command and Alt for Option. Reopening a file puts the cursor back where you left it.
+
 Omarchy's single-key `?` and `Q` would type into a document, so help and quit take Ctrl.
 
 Text is Omarchy's monospace font (iA Writer Mono S by default) at 10pt.

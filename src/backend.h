@@ -43,6 +43,7 @@ public:
     Q_INVOKABLE void changeFontSize(double delta); // 0 resets to the default
     Q_INVOKABLE void openPath(const QString &path);
     Q_INVOKABLE void save();
+    Q_INVOKABLE void rememberCursor(int position); // reopened files put the caret back here
 
     Q_INVOKABLE void search(const QString &query);   // from the sidebar: searches the whole document
     Q_INVOKABLE void showProject(int block);         // from the sidebar: zooms with no search in the way
@@ -50,6 +51,7 @@ public:
     Q_INVOKABLE void toggleFold(int position);
     Q_INVOKABLE void toggleFoldBlock(int block);
     Q_INVOKABLE void foldAll(bool collapse);
+    Q_INVOKABLE void foldItems(int start, int end, bool collapse, bool completely); // TaskPaper's Expand/Collapse Items
     Q_INVOKABLE void toggleFoldAll(); // unfolds if anything is folded, otherwise folds everything
     Q_INVOKABLE void zoomToBlock(int block);
     Q_INVOKABLE void zoomIn(int position);
@@ -58,6 +60,9 @@ public:
     Q_INVOKABLE void deleteBlock(int block);
 
     Q_INVOKABLE QString linkAt(int position) const; // the address under a character, or empty
+    Q_INVOKABLE int findNext(const QString &text, int from, bool backwards); // start of the next match among visible lines, or -1
+    Q_INVOKABLE int replaceRange(int start, int end, const QString &with);    // returns where the replacement ends
+    Q_INVOKABLE int replaceAll(const QString &text, const QString &with);    // visible lines only; returns the count
     Q_INVOKABLE bool newline(int position);
     Q_INVOKABLE void indent(int start, int end, int direction);
     Q_INVOKABLE void toggleDone(int start, int end);
@@ -81,6 +86,7 @@ private slots:
 
 private:
     void load(const QString &path);
+    void persistCursor();
     void refresh();
     void onChange(int position, int removed, int added);
     void applyColors();
@@ -98,6 +104,7 @@ private:
     Highlighter *m_highlighter = nullptr;
     QTextCursor m_zoom, m_pin; // cursors, so they follow the lines as text is edited
     double m_fontSize = 10;
+    int m_cursor = 0;
     bool m_zoomed = false, m_applying = false, m_dirty = false;
     QVariantList m_sidebar, m_foldMarks;
     QList<QTextCursor> m_folds; // fold points, as cursors so they follow the lines when text is edited

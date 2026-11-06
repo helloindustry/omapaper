@@ -98,6 +98,9 @@ void Backend::load(const QString &path) {
     m_applying = false;
     m_dirty = false;
     m_path = path;
+    const int remembered = QSettings("taskpaper", "taskpaper")
+                               .value("cursor/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding)), 0).toInt();
+    m_cursor = qBound(0, remembered, qMax(0, m_doc->characterCount() - 1));
     m_zoomed = false;
     m_folds.clear();
     m_pin = QTextCursor();
@@ -106,15 +109,26 @@ void Backend::load(const QString &path) {
     emit fileChanged();
     emit zoomChanged();
     refresh();
+    if (m_cursor > 0)
+        emit cursorRequested(m_cursor);
 }
 
 void Backend::openPath(const QString &path) {
-    save();
+    save(); // also remembers the caret of the file being left
     load(path);
 }
 
 // Written beside the file and renamed, so a crash never leaves half a document.
+void Backend::rememberCursor(int position) { m_cursor = position; }
+
+// The caret position is kept per file, so reopening puts you back where you stopped.
+void Backend::persistCursor() {
+    if (!m_path.isEmpty() && m_doc)
+        QSettings("taskpaper", "taskpaper").setValue("cursor/" + QString::fromLatin1(m_path.toUtf8().toBase64(QByteArray::Base64UrlEncoding)), m_cursor);
+}
+
 void Backend::save() {
+    persistCursor();
     if (!m_doc || !m_dirty || m_path.isEmpty())
         return;
     const QString text = m_doc->toPlainText();
@@ -426,6 +440,33 @@ void Backend::toggleFoldBlock(int block) {
 
 void Backend::toggleFold(int position) { toggleFoldBlock(m_doc->findBlock(position).blockNumber()); }
 
+// Collapse or expand every item in the selection; "completely" does the same to all their descendants.
+void Backend::foldItems(int start, int end, bool collapse, bool completely) {
+    if (!m_doc)
+        return;
+    const auto range = blockRange(start, end);
+    for (int i = range.first; i <= range.second; ++i) {
+        QList<int> targets{i};
+        if (completely)
+            for (int j = i + 1; j < subtreeEnd(i); ++j)
+                targets << j;
+        for (int t : targets) {
+            if (!hasChildren(t))
+                continue;
+            const int at = foldIndex(t);
+            if (collapse && at < 0)
+                m_folds.append(QTextCursor(m_doc->findBlockByNumber(t)));
+            else if (!collapse && at >= 0)
+                m_folds.removeAt(at);
+        }
+    }
+    if (collapse) {
+        const QTextBlock b = m_doc->findBlockByNumber(range.first);
+        emit cursorRequested(b.position() + b.length() - 1);
+    }
+    refresh();
+}
+
 void Backend::toggleFoldAll() { foldAll(m_folds.isEmpty()); }
 
 void Backend::foldAll(bool collapse) {
@@ -527,6 +568,55 @@ int Backend::subtreeEnd(int block) const {
             break;
     }
     return i;
+}
+
+// Find and replace only touch lines you can see, so a filter or fold never hides a change from you.
+int Backend::findNext(const QString &text, int from, bool backwards) {
+    if (!m_doc || text.isEmpty())
+        return -1;
+    const QTextDocument::FindFlags flags = backwards ? QTextDocument::FindBackward : QTextDocument::FindFlags();
+    for (int pass = 0; pass < 2; ++pass) { // the second pass wraps around
+        int pos = pass == 0 ? from : (backwards ? m_doc->characterCount() - 1 : 0);
+        for (;;) {
+            const QTextCursor found = m_doc->find(text, pos, flags);
+            if (found.isNull())
+                break;
+            if (m_doc->findBlock(found.selectionStart()).isVisible())
+                return found.selectionStart();
+            pos = backwards ? found.selectionStart() : found.selectionEnd();
+        }
+    }
+    return -1;
+}
+
+int Backend::replaceRange(int start, int end, const QString &with) {
+    QTextCursor c(m_doc);
+    c.setPosition(start);
+    c.setPosition(end, QTextCursor::KeepAnchor);
+    c.insertText(with);
+    return c.position();
+}
+
+int Backend::replaceAll(const QString &text, const QString &with) {
+    if (!m_doc || text.isEmpty())
+        return 0;
+    int count = 0, pos = 0;
+    QTextCursor edit(m_doc);
+    edit.beginEditBlock(); // one undo step
+    for (;;) {
+        QTextCursor found = m_doc->find(text, pos);
+        if (found.isNull())
+            break;
+        if (m_doc->findBlock(found.selectionStart()).isVisible()) {
+            found.insertText(with);
+            ++count;
+            pos = found.position();
+        } else {
+            pos = found.selectionEnd();
+        }
+    }
+    edit.endEditBlock();
+    return count;
 }
 
 QString Backend::linkAt(int position) const {
