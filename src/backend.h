@@ -65,6 +65,7 @@ public:
     Q_INVOKABLE void rememberCursor(int position); // reopened files put the caret back here
 
     Q_INVOKABLE void search(const QString &query);   // from the sidebar: searches the whole document
+    Q_INVOKABLE void exclude(const QString &term);   // Ctrl+click in the sidebar: filter this tag out (again to undo)
     Q_INVOKABLE void showProject(int block);         // from the sidebar: zooms with no search in the way
     Q_INVOKABLE void showAll();                      // back to the full document
     Q_INVOKABLE void toggleFold(int position);

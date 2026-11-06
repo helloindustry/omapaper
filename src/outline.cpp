@@ -208,3 +208,12 @@ QList<Link> findLinks(const QString &line) {
     }
     return links;
 }
+
+bool Query::excludes(const Item &item) const {
+    if (m_groups.size() != 1)
+        return false;
+    for (const auto &p : m_groups.first())
+        if (p.negate && test(p, item))
+            return true;
+    return false;
+}

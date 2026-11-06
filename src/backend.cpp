@@ -504,6 +504,11 @@ void Backend::refresh() {
                 visible[j] = true;
         }
     }
+    if (!query.isEmpty())
+        for (int i = 0; i < n; ++i)
+            if (items[i].type != Item::Blank && query.excludes(items[i]))
+                for (int j = i; j < end[i]; ++j)
+                    visible[j] = false;
     if (m_zoomed) {
         const int root = m_zoom.blockNumber();
         for (int i = 0; i < n; ++i)
@@ -657,6 +662,24 @@ void Backend::search(const QString &query) {
             emit cursorRequested(b.position() + b.length() - 1);
             break;
         }
+}
+
+void Backend::exclude(const QString &term) {
+    const QString clause = "not " + term;
+    QStringList parts = m_query.trimmed().isEmpty() ? QStringList() : m_query.split(QRegularExpression(R"(\s+and\s+)", QRegularExpression::CaseInsensitiveOption));
+    QString next;
+    if (parts.contains(clause, Qt::CaseInsensitive)) {
+        // Already filtered out: take it away again.
+        for (int i = parts.size() - 1; i >= 0; --i)
+            if (parts[i].compare(clause, Qt::CaseInsensitive) == 0)
+                parts.removeAt(i);
+        next = parts.join(" and ");
+    } else if (parts.isEmpty() || m_query.contains(QRegularExpression(R"(\s+or\s+)", QRegularExpression::CaseInsensitiveOption))) {
+        next = clause; // an "or" search can't take an extra "and not" safely, so start fresh
+    } else {
+        next = m_query.trimmed() + " and " + clause;
+    }
+    search(next);
 }
 
 void Backend::showProject(int block) {

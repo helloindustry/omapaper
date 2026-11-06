@@ -51,6 +51,9 @@ public:
     static Query parse(const QString &text);
     bool isEmpty() const { return m_groups.isEmpty(); }
     bool matches(const Item &item) const;
+    // With a single AND-group, an item that satisfies one of its `not` terms is filtered out along with everything
+    // under it (TaskPaper needs `except @tag//*` for that; here `not @tag` does it).
+    bool excludes(const Item &item) const;
 
 private:
     struct Predicate {

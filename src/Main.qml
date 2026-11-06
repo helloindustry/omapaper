@@ -227,8 +227,16 @@ ApplicationWindow {
                             TapHandler { onTapped: backend.toggleTagFold(row.modelData.name) }
                         }
                         HoverHandler { id: hover }
+                        // Ctrl+click on a tag (or one of its values) filters it out instead of searching for it.
                         TapHandler {
                             acceptedButtons: Qt.LeftButton
+                            acceptedModifiers: Qt.ControlModifier
+                            enabled: row.modelData.kind === "tag"
+                            onTapped: backend.exclude(row.modelData.query)
+                        }
+                        TapHandler {
+                            acceptedButtons: Qt.LeftButton
+                            acceptedModifiers: Qt.NoModifier
                             enabled: !row.header
                             onTapped: {
                                 if (row.modelData.kind === "all") backend.showAll()
@@ -676,6 +684,7 @@ ApplicationWindow {
                         [qsTr("Find next / previous"), "Ctrl+G / Ctrl+Shift+G"],
                         [qsTr("Filter (search bar)"), "Ctrl+Shift+F"],
                         [qsTr("Save search"), "Ctrl+Shift+E"],
+                        [qsTr("Filter a tag out (sidebar)"), "Ctrl+click"],
                         [qsTr("Toggle sidebar"), "Ctrl+B"],
                         [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
                         [qsTr("Open / Save / Save As"), "Ctrl+O / S / Shift+S"],

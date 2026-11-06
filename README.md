@@ -17,8 +17,8 @@ Inbox:
 
 Links (`https://…`, `www.…`, `mailto:`) are underlined and open in your browser when clicked.
 
-`taskpaper [file]` opens a specific file. Search syntax: `@done`, `not @done`,
-`@due < today`, `project Inbox`, `task milk`, joined with `and` / `or`.
+`taskpaper [file]` opens a specific file. Ctrl+click a tag or tag value in the sidebar to filter it out (`not @tag`); Ctrl+click again to bring it back. Search syntax: `@done`, `not @done`,
+`@due < today`, `not @tag` (hides those items and everything under them), `project Inbox`, `task milk`, joined with `and` / `or`.
 Saved searches live in the file under a `Searches:` project as `@search(query)`.
 
 ## Keys (TaskPaper's, with Ctrl for Command)
