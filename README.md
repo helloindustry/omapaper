@@ -34,6 +34,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+Shift+9 / Ctrl+Shift+0 | Collapse / expand everything |
 | Tab / Shift+Tab (or Ctrl+] / Ctrl+[) | Indent / outdent |
 | Ctrl+Shift+Up / Down | Move item with its children |
+| Ctrl+Shift+M | Pick a project to move the selection (and everything beneath it) into |
 | Ctrl+Shift+Right / Ctrl+Shift+Left | Focus in / out (zoom), as TaskPaper's Option-Command-Right / Left |
 | Ctrl+H | Home: the whole document |
 | Ctrl+F | Find and replace (top right; Enter = next, Shift+Enter = previous, Esc closes) |

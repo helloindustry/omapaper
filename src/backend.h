@@ -97,6 +97,8 @@ public:
     Q_INVOKABLE void toggleDone(int start, int end);
     Q_INVOKABLE void deleteLines(int start, int end); // the lines touched by the selection, plus anything folded inside them
     Q_INVOKABLE void archive(int start, int end); // the selection, or every @done item when nothing is selected
+    Q_INVOKABLE QVariantList moveTargets(int start, int end) const; // projects the selected items could move into
+    Q_INVOKABLE void moveToProject(int start, int end, int targetBlock);
     Q_INVOKABLE void moveLines(int start, int end, int direction);
 
 signals:

@@ -21,6 +21,31 @@ ApplicationWindow {
     property bool sidebarVisible: backend.sidebarShown() // remembered between runs
     onSidebarVisibleChanged: backend.setSidebarShown(sidebarVisible)
     property bool helpVisible: false
+    // The "move to project" list: what was selected when it opened, and the projects it can go to.
+    property bool moveOpen: false
+    property int moveStart: 0
+    property int moveEnd: 0
+    property var moveItems: []
+    property var moveShown: moveItems.filter(item => item.label.toLowerCase().indexOf(moveField.text.toLowerCase()) >= 0)
+    function openMove() {
+        moveStart = editor.selectionStart
+        moveEnd = editor.selectionEnd
+        moveItems = backend.moveTargets(moveStart, moveEnd)
+        moveField.text = ""
+        moveList.currentIndex = 0
+        moveOpen = true
+        moveField.forceActiveFocus()
+    }
+    function closeMove() {
+        moveOpen = false
+        editor.forceActiveFocus()
+    }
+    function chooseMove(index) {
+        if (index < 0 || index >= moveShown.length)
+            return
+        backend.moveToProject(moveStart, moveEnd, moveShown[index].block)
+        closeMove()
+    }
     property bool findVisible: false
     property bool searchOpen: false // the filter bar shows only while it is focused or a search is active
     property string findStatus: ""
@@ -128,6 +153,7 @@ ApplicationWindow {
     // Every key is Ctrl+key or Ctrl+Shift+key: TaskPaper's where known, otherwise the nearest free one.
     // Omarchy's own bindings all use Super, so none of these collide with it.
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
+    Shortcut { sequence: "Ctrl+Shift+M"; context: Qt.ApplicationShortcut; onActivated: win.openMove() }
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
     Shortcut { sequence: "Ctrl+P"; context: Qt.ApplicationShortcut; onActivated: backend.print() }
@@ -724,6 +750,103 @@ ApplicationWindow {
             }
         }
 
+        // Pick a project to move the selected items into.
+        Rectangle {
+            visible: win.moveOpen
+            anchors.fill: parent
+            color: Qt.alpha(theme.background, 0.6)
+            TapHandler { onTapped: win.closeMove() }
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: Math.round(parent.height * 0.15)
+                width: Math.min(460, parent.width - 48)
+                height: moveColumn.implicitHeight + 16
+                color: theme.sidebar
+                border.color: theme.selection
+                radius: Math.min(4, theme.radius)
+                TapHandler { }
+
+                ColumnLayout {
+                    id: moveColumn
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 6
+
+                    TextInput {
+                        id: moveField
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 8
+                        Layout.rightMargin: 8
+                        Layout.preferredHeight: Math.round(win.fs * 2.2)
+                        verticalAlignment: TextInput.AlignVCenter
+                        font.family: backend.fontFamily
+                        font.pointSize: win.fs
+                        color: theme.foreground
+                        selectionColor: theme.accent
+                        selectedTextColor: theme.accentForeground
+                        clip: true
+                        onTextChanged: moveList.currentIndex = 0
+                        Keys.onEscapePressed: win.closeMove()
+                        Keys.onReturnPressed: win.chooseMove(moveList.currentIndex)
+                        Keys.onEnterPressed: win.chooseMove(moveList.currentIndex)
+                        Keys.onUpPressed: moveList.currentIndex = Math.max(0, moveList.currentIndex - 1)
+                        Keys.onDownPressed: moveList.currentIndex = Math.min(win.moveShown.length - 1, moveList.currentIndex + 1)
+                        Text {
+                            visible: !moveField.text
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: qsTr("Move to project…")
+                            font: moveField.font
+                            color: theme.muted
+                        }
+                    }
+
+                    ListView {
+                        id: moveList
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.min(contentHeight, Math.round(win.fs * 2 * 10))
+                        clip: true
+                        model: win.moveShown
+                        boundsBehavior: Flickable.StopAtBounds
+                        currentIndex: 0
+                        onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
+                        delegate: Item {
+                            id: moveRow
+                            required property var modelData
+                            required property int index
+                            width: ListView.view.width
+                            height: Math.round(win.fs * 2)
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: Math.min(4, theme.radius)
+                                color: moveRow.index === moveList.currentIndex ? theme.selection : "transparent"
+                            }
+                            Text {
+                                x: 8 + moveRow.modelData.level * 14
+                                width: parent.width - x - 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: moveRow.modelData.label
+                                elide: Text.ElideRight
+                                font.family: backend.fontFamily
+                                font.pointSize: win.fs - 0.75
+                                color: theme.foreground
+                            }
+                            TapHandler { onTapped: win.chooseMove(moveRow.index) }
+                        }
+                    }
+
+                    Text {
+                        visible: win.moveShown.length === 0
+                        Layout.leftMargin: 8
+                        text: win.moveItems.length === 0 ? qsTr("No projects to move into") : qsTr("No match")
+                        font.family: backend.fontFamily
+                        font.pointSize: win.fs - 0.75
+                        color: theme.muted
+                    }
+                }
+            }
+        }
+
         // Every key, on one screen.
         Rectangle {
             visible: win.helpVisible
@@ -747,6 +870,7 @@ ApplicationWindow {
                         [qsTr("Collapse / expand all"), "Ctrl+Shift+9 / 0"],
                         [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
                         [qsTr("Move up / down"), "Ctrl+Shift+Up / Down"],
+                        [qsTr("Move to a project"), "Ctrl+Shift+M"],
                         [qsTr("Focus in / out"), "Ctrl+Shift+Right / Left"],
                         [qsTr("Home (whole document)"), "Ctrl+H"],
                         [qsTr("Find and replace"), "Ctrl+F"],

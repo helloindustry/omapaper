@@ -1378,6 +1378,102 @@ void Backend::archive(int start, int end) {
 }
 
 // Moves the selected lines, with their children, past the neighbouring item at the same level.
+// The projects a selection could be moved into: every project except those inside the selection itself,
+// the Searches project, and saved searches.
+QVariantList Backend::moveTargets(int start, int end) const {
+    QVariantList targets;
+    if (!m_doc)
+        return targets;
+    const auto range = blockRange(start, end);
+    const int chunkEnd = subtreeEnd(range.second);
+    int searchesEnd = -1;
+    for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next()) {
+        const int n = b.blockNumber();
+        const Item item = parseLine(b.text());
+        if (item.type == Item::Project && item.indent == 0 && item.title == "Searches")
+            searchesEnd = subtreeEnd(n);
+        if (item.type != Item::Project || item.hasTag("search") || (searchesEnd > n))
+            continue;
+        if (n >= range.first && n < chunkEnd)
+            continue;
+        targets << QVariantMap{{"label", item.title}, {"level", item.indent / 4}, {"block", n}};
+    }
+    return targets;
+}
+
+// Moves the selected items, and everything beneath them, to the end of a project, indented to sit inside it.
+void Backend::moveToProject(int start, int end, int targetBlock) {
+    if (!m_doc || !m_doc->findBlockByNumber(targetBlock).isValid())
+        return;
+    const auto range = blockRange(start, end);
+    const int first = range.first;
+    int last = subtreeEnd(range.second);
+    while (last > first + 1 && parseLine(m_doc->findBlockByNumber(last - 1).text()).type == Item::Blank)
+        --last; // spacing after the items stays behind
+    if (targetBlock >= first && targetBlock < last)
+        return; // into itself
+
+    // After the target's last real line, so trailing blank lines stay below the moved items.
+    int after = subtreeEnd(targetBlock);
+    while (after > targetBlock + 1 && parseLine(m_doc->findBlockByNumber(after - 1).text()).type == Item::Blank)
+        --after;
+    const Item target = parseLine(m_doc->findBlockByNumber(targetBlock).text());
+
+    int smallest = -1;
+    for (int i = first; i < last; ++i) {
+        const Item item = parseLine(m_doc->findBlockByNumber(i).text());
+        if (item.type != Item::Blank && (smallest < 0 || item.indent < smallest))
+            smallest = item.indent;
+    }
+    const int delta = target.indent + 4 - qMax(smallest, 0); // columns to shift everything by
+    auto shifted = [&](QString line) {
+        if (line.trimmed().isEmpty())
+            return line;
+        if (delta >= 0)
+            return QString(delta / 4, '\t') + QString(delta % 4, ' ') + line;
+        int remove = -delta, i = 0;
+        while (i < line.size() && remove > 0 && (line[i] == '\t' || line[i] == ' ')) {
+            remove -= line[i] == '\t' ? 4 : 1;
+            ++i;
+        }
+        return line.mid(i);
+    };
+    auto text = [&](int from, int to, bool shift) {
+        QStringList lines;
+        for (int i = from; i < to; ++i) {
+            const QString line = m_doc->findBlockByNumber(i).text();
+            lines << (shift ? shifted(line) : line);
+        }
+        return lines;
+    };
+
+    // Rewrite the span between the two places in one edit, so a single Undo puts everything back.
+    const QStringList moving = text(first, last, true);
+    QStringList rewritten;
+    int a, b, newFirst;
+    if (after >= last) {
+        a = first;
+        b = after;
+        rewritten = text(last, after, false) + moving;
+        newFirst = after - (last - first);
+    } else {
+        a = after;
+        b = last;
+        rewritten = moving + text(after, first, false);
+        newFirst = after;
+    }
+    // Open the target if it was folded, so the moved items can be seen.
+    if (const int at = foldIndex(targetBlock); at >= 0)
+        m_folds.removeAt(at);
+    QTextCursor c(m_doc->findBlockByNumber(a));
+    c.setPosition(m_doc->findBlockByNumber(b - 1).position() + m_doc->findBlockByNumber(b - 1).length() - 1, QTextCursor::KeepAnchor);
+    c.insertText(rewritten.join("\n"));
+    const QTextBlock s = m_doc->findBlockByNumber(newFirst);
+    const QTextBlock e = m_doc->findBlockByNumber(newFirst + (last - first) - 1);
+    refresh();
+    emit moved(s.position(), e.position() + e.length() - 1);
+}
+
 void Backend::moveLines(int start, int end, int direction) {
     const auto range = blockRange(start, end);
     // Blank lines after an item stay where they are; they are spacing, not part of what moves.
