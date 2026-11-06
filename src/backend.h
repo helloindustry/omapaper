@@ -79,6 +79,7 @@ public:
     Q_INVOKABLE void saveSearch();
     Q_INVOKABLE void deleteBlock(int block);
 
+    Q_INVOKABLE QString tagAt(int position) const;  // the search for the tag under a character, or empty
     Q_INVOKABLE QString linkAt(int position) const; // the address under a character, or empty
     Q_INVOKABLE int findNext(const QString &text, int from, bool backwards); // start of the next match among visible lines, or -1
     Q_INVOKABLE int replaceRange(int start, int end, const QString &with);    // returns where the replacement ends

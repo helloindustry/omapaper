@@ -352,6 +352,12 @@ ApplicationWindow {
                             onPressedChanged: if (pressed) editor.ctrlBase = editor.cursorPosition
                             onTapped: eventPoint => {
                                 const clicked = editor.positionAt(eventPoint.position.x, eventPoint.position.y)
+                                // Ctrl+click on a tag filters it out, as in the sidebar.
+                                const tag = backend.tagAt(clicked)
+                                if (tag !== "") {
+                                    backend.exclude(tag)
+                                    return
+                                }
                                 // The caret that was there stays as an extra; the click becomes the main caret.
                                 const base = editor.ctrlBase === clicked ? editor.previousPos : editor.ctrlBase
                                 backend.addCursor(base, clicked)
@@ -452,18 +458,27 @@ ApplicationWindow {
                             }
                         }
 
-                        // Links open on a click and show a pointing hand, as in TaskPaper.
+                        // Links open on a click, and tags search for themselves like the sidebar's; both show a pointing hand.
                         property bool overLink: false
                         HoverHandler {
-                            onPointChanged: editor.overLink = backend.linkAt(editor.positionAt(point.position.x, point.position.y)) !== ""
+                            onPointChanged: {
+                                const at = editor.positionAt(point.position.x, point.position.y)
+                                editor.overLink = backend.linkAt(at) !== "" || backend.tagAt(at) !== ""
+                            }
                         }
                         HoverHandler { enabled: editor.overLink; cursorShape: Qt.PointingHandCursor }
                         TapHandler {
                             acceptedModifiers: Qt.NoModifier
                             onTapped: eventPoint => {
                                 backend.clearCursors()
-                                const url = backend.linkAt(editor.positionAt(eventPoint.position.x, eventPoint.position.y))
-                                if (url !== "") Qt.openUrlExternally(url)
+                                const at = editor.positionAt(eventPoint.position.x, eventPoint.position.y)
+                                const url = backend.linkAt(at)
+                                if (url !== "") {
+                                    Qt.openUrlExternally(url)
+                                    return
+                                }
+                                const tag = backend.tagAt(at)
+                                if (tag !== "") backend.search(tag)
                             }
                         }
 

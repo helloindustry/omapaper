@@ -948,6 +948,18 @@ int Backend::replaceAll(const QString &text, const QString &with) {
     return count;
 }
 
+// "@due(2026-11-10)" gives "@due = 2026-11-10" and a bare "@home" gives "@home": the same searches the sidebar makes.
+QString Backend::tagAt(int position) const {
+    if (!m_doc || position < 0)
+        return {};
+    const QTextBlock b = m_doc->findBlock(position);
+    const int column = position - b.position();
+    for (const auto &tag : parseLine(b.text()).tags)
+        if (column >= tag.start && column <= tag.start + tag.length)
+            return "@" + tag.name + (tag.hasValue && !tag.value.isEmpty() ? " = " + tag.value : QString());
+    return {};
+}
+
 QString Backend::linkAt(int position) const {
     if (!m_doc || position < 0)
         return {};
