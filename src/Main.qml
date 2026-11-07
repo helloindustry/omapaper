@@ -55,6 +55,38 @@ ApplicationWindow {
         backend.moveToProject(moveStart, moveEnd, moveShown[index].block, moveCaret)
         closeMove()
     }
+    // Ctrl+Up / Ctrl+Down move the sidebar's selection (Home, projects, tags, saved searches) and open it, as a click would.
+    function sidebarCurrent(row) {
+        const state = row.kind === "tag" ? backend.termState(row.query) : 0
+        if (state === 1) return true
+        if (state === 2) return false
+        if (row.kind === "project") return backend.zoomBlock === row.block && backend.query === ""
+        if (row.kind === "all") return backend.zoomBlock < 0 && backend.query === ""
+        if (row.kind === "header") return false
+        return backend.zoomBlock < 0 && backend.query === row.query
+    }
+    function stepSidebar(direction) {
+        if (!win.sidebarVisible)
+            return
+        const rows = backend.sidebar
+        let at = -1
+        for (let i = 0; i < rows.length && at < 0; ++i)
+            if (rows[i].kind !== "header" && sidebarCurrent(rows[i]))
+                at = i
+        let next = at
+        do {
+            next += direction
+        } while (next >= 0 && next < rows.length && rows[next].kind === "header")
+        if (at < 0)
+            next = direction > 0 ? rows.findIndex(r => r.kind !== "header") : rows.length - 1 - [...rows].reverse().findIndex(r => r.kind !== "header")
+        if (next < 0 || next >= rows.length)
+            return
+        const row = rows[next]
+        if (row.kind === "all") backend.showAll()
+        else if (row.kind === "project") backend.showProject(row.block)
+        else backend.search(row.query)
+        list.positionViewAtIndex(next, ListView.Contain)
+    }
     property bool findVisible: false
     property bool searchOpen: false // the filter bar shows only while it is focused or a search is active
     property string findStatus: ""
@@ -196,6 +228,8 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+Down"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, 1) }
     Shortcut { sequence: "Ctrl+Shift+Right"; context: Qt.ApplicationShortcut; onActivated: backend.zoomIn(editor.cursorPosition) }
     Shortcut { sequence: "Ctrl+Shift+Left"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
+    Shortcut { sequence: "Ctrl+Up"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.stepSidebar(-1) }
+    Shortcut { sequence: "Ctrl+Down"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.stepSidebar(1) }
     Shortcut { sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
 
     Item {
@@ -336,11 +370,55 @@ ApplicationWindow {
                 // The search bar; typing filters the document as you go.
                 Rectangle {
                     visible: win.searchOpen || backend.query !== ""
+                    z: 10 // the tag suggestions hang below this bar, over the editor
                     Layout.fillWidth: true
                     Layout.preferredHeight: Math.round(win.fs * 3.6)
                     color: theme.sidebar
                     TextInput {
                         id: search
+                        // Typing "@" offers the document's tags; Down/Up choose, Enter or Tab completes, Esc just closes the list.
+                        property string tagPrefix: ""
+                        property var tagChoices: []
+                        property int tagPicked: -1
+                        property bool tagsDismissed: false
+                        function refreshTags() {
+                            const m = text.slice(0, cursorPosition).match(/(^|[\s(])@([\w.\-]*)$/)
+                            tagPrefix = m ? m[2] : ""
+                            let out = []
+                            if (m && !tagsDismissed) {
+                                const want = tagPrefix.toLowerCase()
+                                for (const row of backend.sidebar)
+                                    if (row.kind === "tag" && row.level === 0 && row.name.toLowerCase().indexOf(want) === 0
+                                            && !(row.name.toLowerCase() === want))
+                                        out.push(row.name)
+                            }
+                            tagChoices = out.slice(0, 8)
+                            tagPicked = -1
+                        }
+                        function completeTag(name) {
+                            // insert/remove edit the text the way typing does, so the binding to the query survives.
+                            const at = text.slice(0, cursorPosition).lastIndexOf("@")
+                            remove(at, cursorPosition)
+                            insert(at, "@" + name)
+                            cursorPosition = at + 1 + name.length
+                            backend.query = text
+                            tagsDismissed = false
+                            refreshTags()
+                        }
+                        onTextEdited: { tagsDismissed = false; backend.query = text }
+                        onTextChanged: refreshTags()
+                        onCursorPositionChanged: refreshTags()
+                        Keys.onPressed: event => {
+                            if (tagChoices.length === 0)
+                                return
+                            if (event.key === Qt.Key_Down) tagPicked = Math.min(tagChoices.length - 1, tagPicked + 1)
+                            else if (event.key === Qt.Key_Up && tagPicked >= 0) tagPicked -= 1
+                            else if (event.key === Qt.Key_Tab) completeTag(tagChoices[Math.max(tagPicked, 0)])
+                            else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && tagPicked >= 0) completeTag(tagChoices[tagPicked])
+                            else if (event.key === Qt.Key_Escape) { tagsDismissed = true; refreshTags() }
+                            else return
+                            event.accepted = true
+                        }
                         anchors.fill: parent
                         anchors.leftMargin: 16
                         anchors.rightMargin: 16
@@ -352,16 +430,61 @@ ApplicationWindow {
                         selectedTextColor: theme.accentForeground
                         clip: true
                         text: backend.query
-                        onTextEdited: backend.query = text
                         onActiveFocusChanged: if (!activeFocus && backend.query === "") win.searchOpen = false
-                        Keys.onEscapePressed: { backend.query = ""; win.searchOpen = false; editor.forceActiveFocus() }
-                        Keys.onReturnPressed: editor.forceActiveFocus()
+                        // Specific key handlers run before Keys.onPressed, so the open suggestion list is answered here too.
+                        Keys.onEscapePressed: {
+                            if (tagChoices.length > 0) { tagsDismissed = true; refreshTags(); return }
+                            backend.query = ""; win.searchOpen = false; editor.forceActiveFocus()
+                        }
+                        Keys.onReturnPressed: {
+                            if (tagChoices.length > 0 && tagPicked >= 0) completeTag(tagChoices[tagPicked])
+                            else editor.forceActiveFocus()
+                        }
+                        Keys.onEnterPressed: {
+                            if (tagChoices.length > 0 && tagPicked >= 0) completeTag(tagChoices[tagPicked])
+                            else editor.forceActiveFocus()
+                        }
                         Text {
                             visible: !search.text && !search.activeFocus
                             anchors.verticalCenter: parent.verticalCenter
                             text: qsTr("Search")
                             font: search.font
                             color: theme.muted
+                        }
+                    }
+                    Rectangle {
+                        visible: search.activeFocus && search.tagChoices.length > 0
+                        x: 12
+                        y: parent.height
+                        width: 260
+                        height: search.tagChoices.length * Math.round(win.fs * 2.2) + 8
+                        color: theme.sidebar
+                        border.color: theme.selection
+                        radius: 4
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 4
+                            Repeater {
+                                model: search.tagChoices
+                                delegate: Rectangle {
+                                    required property string modelData
+                                    required property int index
+                                    width: parent.width
+                                    height: Math.round(win.fs * 2.2)
+                                    radius: 3
+                                    color: index === search.tagPicked ? theme.selection : "transparent"
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        x: 8
+                                        textFormat: Text.StyledText
+                                        text: "<font color=\"" + theme.accent + "\">@" + modelData.slice(0, search.tagPrefix.length) + "</font>" + modelData.slice(search.tagPrefix.length)
+                                        color: theme.foreground
+                                        font.family: backend.fontFamily
+                                        font.pointSize: win.fs - 0.75
+                                    }
+                                    TapHandler { onTapped: search.completeTag(modelData) }
+                                }
+                            }
                         }
                     }
                 }
@@ -474,6 +597,9 @@ ApplicationWindow {
                         Keys.onPressed: event => {
                             // The editor claims Ctrl+Shift+Left/Right itself (select by word), so a Shortcut never sees them.
                             const ctrlShift = (event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier) && !(event.modifiers & Qt.AltModifier)
+                            if (win.sidebarVisible && event.modifiers === Qt.ControlModifier && (event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
+                                win.stepSidebar(event.key === Qt.Key_Up ? -1 : 1); event.accepted = true; return
+                            }
                             if (ctrlShift && event.key === Qt.Key_Right) { backend.zoomIn(editor.cursorPosition); event.accepted = true; return }
                             if (ctrlShift && event.key === Qt.Key_Left) { backend.zoomOut(); event.accepted = true; return }
                             if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier) && (event.modifiers & Qt.AltModifier)
@@ -958,6 +1084,8 @@ ApplicationWindow {
                 [qsTr("Move to a project"), "Ctrl+Shift+M", () => win.openMove()],
                 [qsTr("Focus in"), "Ctrl+Shift+Right", () => backend.zoomIn(editor.cursorPosition)],
                 [qsTr("Focus out"), "Ctrl+Shift+Left", () => backend.zoomOut()],
+                [qsTr("Previous in the sidebar"), "Ctrl+Up", () => win.stepSidebar(-1)],
+                [qsTr("Next in the sidebar"), "Ctrl+Down", () => win.stepSidebar(1)],
                 [qsTr("Home (whole document)"), "Ctrl+H", () => backend.showAll()],
                 [qsTr("Find and replace"), "Ctrl+F", () => win.openFind()],
                 [qsTr("Find next"), "Ctrl+G", () => win.findAgain(false)],
