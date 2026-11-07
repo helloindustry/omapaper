@@ -1610,6 +1610,9 @@ void Backend::archive(int start, int end) {
     c.setPosition(archiveLine.position() + archiveLine.length() - 1);
     c.insertText("\n" + moved.join("\n"));
     c.endEditBlock();
+    // The new lines start out visible. If Archive is folded, hide them right now instead of on the delayed refresh,
+    // which let them show for a moment before closing again.
+    refresh();
 }
 
 // Moves the selected lines, with their children, past the neighbouring item at the same level.
