@@ -161,7 +161,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
     Shortcut { sequence: "Ctrl+P"; context: Qt.ApplicationShortcut; onActivated: backend.print() }
-    Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; onActivated: backend.save() }
+    Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveNow() }
     Shortcut { sequence: "Ctrl+Shift+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveAsDialog() }
     Shortcut { sequences: ["Ctrl+=", "Ctrl++"]; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(1) }
     Shortcut { sequence: "Ctrl+-"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(-1) }
@@ -941,7 +941,7 @@ ApplicationWindow {
                 [qsTr("Smaller text"), "Ctrl+-", () => backend.changeFontSize(-1)],
                 [qsTr("Reset text size"), "Ctrl+0", () => backend.changeFontSize(0)],
                 [qsTr("Open"), "Ctrl+O", () => backend.openDialog()],
-                [qsTr("Save"), "Ctrl+S", () => backend.save()],
+                [qsTr("Save"), "Ctrl+S", () => backend.saveNow()],
                 [qsTr("Save As"), "Ctrl+Shift+S", () => backend.saveAsDialog()],
                 [qsTr("Print"), "Ctrl+P", () => backend.print()],
                 [qsTr("Undo"), "Ctrl+Z", () => editor.undo()],

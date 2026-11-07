@@ -386,6 +386,12 @@ void Backend::save() {
     showNotice(tr("Saved"), 1500);
 }
 
+void Backend::saveNow() {
+    save();
+    if (!m_path.isEmpty() && m_error.isEmpty())
+        showNotice(tr("Saved"), 1500);
+}
+
 // The open dialog is the desktop's own, reached through xdg-desktop-portal.
 void Backend::openDialog() {
     auto bus = QDBusConnection::sessionBus();
