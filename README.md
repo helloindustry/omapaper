@@ -42,9 +42,8 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+Shift+Up / Down | Move item with its children |
 | Ctrl+Shift+M | Pick a project to move the selection (and everything beneath it) into |
 | Ctrl+Shift+Right / Ctrl+Shift+Left | Focus in / out (zoom), as TaskPaper's Option-Command-Right / Left |
-| Ctrl+Shift+H | Home: the whole document |
-| Ctrl+F | Find (top right; Enter = next, Shift+Enter = previous, Esc closes) |
-| Ctrl+H | Find and replace (the same panel, starting in the replace box) |
+| Ctrl+H (or Ctrl+Shift+H) | Home: the whole document |
+| Ctrl+F | Find and replace (top right; Enter = next, Shift+Enter = previous, Esc closes) |
 | Ctrl+E | Use the selection for find |
 | Ctrl+G / Ctrl+Shift+G | Find next / previous |
 | Ctrl+Shift+F | Filter with the search bar |

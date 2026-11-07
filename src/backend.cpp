@@ -1448,6 +1448,16 @@ void Backend::setHover(int start, int end) {
 }
 
 // Where a tag or link sits in the document, so the editor can tell a click on it from a click in the blank space after it.
+// The end of the last line you can see; a click in the empty space below the text puts the caret there.
+int Backend::endOfVisible() const {
+    if (!m_doc)
+        return 0;
+    for (QTextBlock b = m_doc->lastBlock(); b.isValid(); b = b.previous())
+        if (b.isVisible())
+            return b.position() + b.length() - 1;
+    return 0;
+}
+
 int Backend::blockPosition(int block) const {
     const QTextBlock b = m_doc ? m_doc->findBlockByNumber(block) : QTextBlock();
     return b.isValid() ? b.position() : 0;

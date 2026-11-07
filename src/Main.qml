@@ -201,12 +201,11 @@ ApplicationWindow {
         backend.sidebarWidth = Math.max(120, Math.min(Math.ceil(widest), win.width * 0.6))
     }
 
-    function openFind(replace) {
+    function openFind() {
         useSelectionForFind()
         win.findVisible = true
-        const field = replace === true ? replaceField : findField // Ctrl+H starts in the replace box, as Omawrite's does
-        field.input.forceActiveFocus()
-        field.input.selectAll()
+        findField.input.forceActiveFocus()
+        findField.input.selectAll()
     }
     // Ctrl+E: whatever is selected on one line becomes the thing to find.
     function useSelectionForFind() {
@@ -299,7 +298,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+Left"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
     Shortcut { sequence: "Ctrl+Up"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.stepSidebar(-1) }
     Shortcut { sequence: "Ctrl+Down"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.stepSidebar(1) }
-    Shortcut { sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; onActivated: win.openFind(true) }
+    Shortcut { sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
     Shortcut { sequence: "Ctrl+Shift+H"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
 
     Item {
@@ -635,6 +634,19 @@ ApplicationWindow {
                         property int currentPos: 0
                         onCursorPositionChanged: { previousPos = currentPos; currentPos = cursorPosition; backend.rememberCursor(cursorPosition) }
                         Component.onCompleted: backend.attach(textDocument)
+
+                        // A click in the empty space below the text puts the caret at the end of the last visible line.
+                        // (Left to itself, Qt picks a spot inside a folded or filtered-out line.)
+                        TapHandler {
+                            acceptedModifiers: Qt.NoModifier
+                            onTapped: eventPoint => {
+                                const end = backend.endOfVisible()
+                                const last = editor.positionToRectangle(end)
+                                // Qt finishes its own handling of the click after this, so the caret is set once that is done.
+                                if (eventPoint.position.y > last.y + last.height)
+                                    Qt.callLater(() => { editor.deselect(); editor.cursorPosition = end })
+                            }
+                        }
 
                         // Ctrl+scroll sizes the text, as Ctrl+= and Ctrl+- do.
                         WheelHandler {
@@ -1172,9 +1184,8 @@ ApplicationWindow {
                 [qsTr("Open project 1 to 9 (top to bottom)"), "Ctrl+1 … Ctrl+9", null],
                 [qsTr("Previous in the sidebar"), "Ctrl+Up", () => win.stepSidebar(-1)],
                 [qsTr("Next in the sidebar"), "Ctrl+Down", () => win.stepSidebar(1)],
-                [qsTr("Home (whole document)"), "Ctrl+Shift+H", () => backend.showAll()],
-                [qsTr("Find"), "Ctrl+F", () => win.openFind()],
-                [qsTr("Find and replace"), "Ctrl+H", () => win.openFind(true)],
+                [qsTr("Home (whole document)"), "Ctrl+H or Ctrl+Shift+H", () => backend.showAll()],
+                [qsTr("Find and replace"), "Ctrl+F", () => win.openFind()],
                 [qsTr("Use selection for find"), "Ctrl+E", () => win.useSelectionForFind()],
                 [qsTr("Find next"), "Ctrl+G", () => win.findAgain(false)],
                 [qsTr("Find previous"), "Ctrl+Shift+G", () => win.findAgain(true)],
