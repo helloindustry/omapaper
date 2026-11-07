@@ -1,3 +1,4 @@
+#include <QFile>
 #include <QGuiApplication>
 #include "backend.h"
 
