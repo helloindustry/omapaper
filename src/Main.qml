@@ -900,7 +900,7 @@ ApplicationWindow {
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 6
             height: win.barHeight // one regular line, shaded like a highlighted line
-            color: theme.selection
+            color: Qt.alpha(theme.selection, 0.45)
             opacity: active ? 1 : 0
             visible: opacity > 0
             Behavior on opacity { NumberAnimation { duration: 180 } }
@@ -916,7 +916,7 @@ ApplicationWindow {
                 text: win.deleteBlock >= 0 ? qsTr("Delete “%1”?  y / n").arg(win.deleteName) : toast.shownText
                 font.family: backend.fontFamily
                 font.pointSize: win.fs
-                color: theme.foreground
+                color: theme.muted
             }
         }
 
