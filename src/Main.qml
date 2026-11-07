@@ -65,6 +65,20 @@ ApplicationWindow {
         if (row.kind === "header") return false
         return backend.zoomBlock < 0 && backend.query === row.query
     }
+    // Ctrl+1 ... Ctrl+9 open the first nine projects, top to bottom, as clicking them in the sidebar would.
+    function openProjectNumber(number) {
+        const rows = backend.sidebar
+        let seen = 0
+        for (let i = 0; i < rows.length; ++i) {
+            if (rows[i].kind !== "project")
+                continue
+            if (++seen === number) {
+                backend.showProject(rows[i].block)
+                list.positionViewAtIndex(i, ListView.Contain)
+                return
+            }
+        }
+    }
     function stepSidebar(direction) {
         if (!win.sidebarVisible)
             return
@@ -217,7 +231,15 @@ ApplicationWindow {
     Shortcut { sequences: ["Ctrl+D", "Ctrl+Return", "Ctrl+Enter"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+K"; context: Qt.ApplicationShortcut; onActivated: backend.deleteLines(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
-    Shortcut { sequence: "Ctrl+9"; context: Qt.ApplicationShortcut; onActivated: {  if (backend.shiftHeld()) backend.foldAll(true, editor.cursorPosition); else backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false) } }
+    Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; onActivated: { if (!backend.shiftHeld()) win.openProjectNumber(1) } }
+    Shortcut { sequence: "Ctrl+2"; context: Qt.ApplicationShortcut; onActivated: { if (!backend.shiftHeld()) win.openProjectNumber(2) } }
+    Shortcut { sequence: "Ctrl+3"; context: Qt.ApplicationShortcut; onActivated: { if (!backend.shiftHeld()) win.openProjectNumber(3) } }
+    Shortcut { sequence: "Ctrl+4"; context: Qt.ApplicationShortcut; onActivated: { if (!backend.shiftHeld()) win.openProjectNumber(4) } }
+    Shortcut { sequence: "Ctrl+5"; context: Qt.ApplicationShortcut; onActivated: { if (!backend.shiftHeld()) win.openProjectNumber(5) } }
+    Shortcut { sequence: "Ctrl+6"; context: Qt.ApplicationShortcut; onActivated: { if (!backend.shiftHeld()) win.openProjectNumber(6) } }
+    Shortcut { sequence: "Ctrl+7"; context: Qt.ApplicationShortcut; onActivated: { if (!backend.shiftHeld()) win.openProjectNumber(7) } }
+    Shortcut { sequence: "Ctrl+8"; context: Qt.ApplicationShortcut; onActivated: { if (!backend.shiftHeld()) win.openProjectNumber(8) } }
+    Shortcut { sequence: "Ctrl+9"; context: Qt.ApplicationShortcut; onActivated: {  if (backend.shiftHeld()) backend.foldAll(true, editor.cursorPosition); else win.openProjectNumber(9) } }
     Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: {  if (backend.shiftHeld()) backend.foldAll(false, editor.cursorPosition); else backend.changeFontSize(0) } }
     Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; onActivated: { if (backend.shiftHeld()) backend.foldAll(true, editor.cursorPosition); else backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false) } }
     Shortcut { sequence: "Ctrl+."; context: Qt.ApplicationShortcut; onActivated: { if (backend.shiftHeld()) backend.foldAll(false, editor.cursorPosition); else backend.foldItems(editor.selectionStart, editor.selectionEnd, false, false) } }
@@ -1071,7 +1093,7 @@ ApplicationWindow {
                 [qsTr("Toggle done"), "Ctrl+D", () => backend.toggleDone(editor.selectionStart, editor.selectionEnd)],
                 [qsTr("Archive done items / selection"), "Ctrl+Shift+A", () => backend.archive(editor.selectionStart, editor.selectionEnd)],
                 [qsTr("Delete line"), "Ctrl+Shift+K", () => backend.deleteLines(editor.selectionStart, editor.selectionEnd)],
-                [qsTr("Collapse item"), "Ctrl+, / Ctrl+9", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false)],
+                [qsTr("Collapse item"), "Ctrl+,", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false)],
                 [qsTr("Expand item"), "Ctrl+.", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, false, false)],
                 [qsTr("Collapse everything"), "Ctrl+Shift+,", () => backend.foldAll(true, editor.cursorPosition)],
                 [qsTr("Expand everything"), "Ctrl+Shift+.", () => backend.foldAll(false, editor.cursorPosition)],
@@ -1083,6 +1105,7 @@ ApplicationWindow {
                 [qsTr("Move to a project"), "Ctrl+Shift+M", () => win.openMove()],
                 [qsTr("Focus in"), "Ctrl+Shift+Right", () => backend.zoomIn(editor.cursorPosition)],
                 [qsTr("Focus out"), "Ctrl+Shift+Left", () => backend.zoomOut()],
+                [qsTr("Open project 1 to 9 (top to bottom)"), "Ctrl+1 … Ctrl+9", null],
                 [qsTr("Previous in the sidebar"), "Ctrl+Up", () => win.stepSidebar(-1)],
                 [qsTr("Next in the sidebar"), "Ctrl+Down", () => win.stepSidebar(1)],
                 [qsTr("Home (whole document)"), "Ctrl+H", () => backend.showAll()],
