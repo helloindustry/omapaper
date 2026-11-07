@@ -172,6 +172,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false) }
     Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(0) }
+    Shortcut { sequences: ["Ctrl+Shift+.", "Ctrl+>", "Ctrl+Shift+>"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleFoldAll() }
     Shortcut { sequences: ["Ctrl+Shift+9", "Ctrl+(", "Ctrl+Shift+("]; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(true) }
     Shortcut { sequences: ["Ctrl+Shift+0", "Ctrl+)", "Ctrl+Shift+)"]; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(false) }
     Shortcut { sequence: "Ctrl+."; context: Qt.ApplicationShortcut; onActivated: backend.toggleFold(editor.cursorPosition) }
@@ -415,6 +416,7 @@ ApplicationWindow {
                             if (ctrlShift && event.key === Qt.Key_Left) { backend.zoomOut(); event.accepted = true; return }
                             // Collapse / expand all. The shortcuts above can miss when the keyboard reports Shift+9 as "(" and
                             // Shift+0 as ")", so the editor answers those keys itself.
+                            if (ctrlShift && (event.key === Qt.Key_Period || event.key === Qt.Key_Greater)) { backend.toggleFoldAll(); event.accepted = true; return }
                             if (ctrlShift && (event.key === Qt.Key_9 || event.key === Qt.Key_ParenLeft)) { backend.foldAll(true); event.accepted = true; return }
                             if (ctrlShift && (event.key === Qt.Key_0 || event.key === Qt.Key_ParenRight)) { backend.foldAll(false); event.accepted = true; return }
                             if (event.key === Qt.Key_End && acceptSuggestion()) {
