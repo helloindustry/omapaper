@@ -1600,7 +1600,7 @@ QVariantList Backend::moveTargets(int start, int end) const {
 }
 
 // Moves the selected items, and everything beneath them, to the end of a project, indented to sit inside it.
-void Backend::moveToProject(int start, int end, int targetBlock) {
+void Backend::moveToProject(int start, int end, int targetBlock, int caret) {
     if (!m_doc || !m_doc->findBlockByNumber(targetBlock).isValid())
         return;
     const auto range = blockRange(start, end);
@@ -1660,16 +1660,43 @@ void Backend::moveToProject(int start, int end, int targetBlock) {
         rewritten = moving + text(after, first, false);
         newFirst = after;
     }
-    // Open the target if it was folded, so the moved items can be seen.
-    if (const int at = foldIndex(targetBlock); at >= 0)
-        m_folds.removeAt(at);
+    // Nothing opens or closes: folds are remembered by line and put back on the lines' new positions after the rewrite.
+    const int lenMoving = last - first;
+    QList<int> foldedNow;
+    for (int f = m_folds.size() - 1; f >= 0; --f) {
+        const int fb = m_folds[f].blockNumber();
+        if (fb < a || fb >= b)
+            continue;
+        if (after >= last)
+            foldedNow << (fb >= first && fb < last ? newFirst + (fb - first) : a + (fb - last));
+        else
+            foldedNow << (fb >= first && fb < last ? newFirst + (fb - first) : a + lenMoving + (fb - after));
+        m_folds.removeAt(f);
+    }
+
+    // The caret goes to the same place in the moved item: same line, same spot in the text.
+    int caretLine = -1, caretColumn = 0, indentChange = 0;
+    if (caret >= 0) {
+        const QTextBlock cb = m_doc->findBlock(caret);
+        if (cb.isValid() && cb.blockNumber() >= first && cb.blockNumber() < last) {
+            caretLine = cb.blockNumber() - first;
+            caretColumn = caret - cb.position();
+            indentChange = shifted(cb.text()).size() - cb.text().size();
+        }
+    }
+
     QTextCursor c(m_doc->findBlockByNumber(a));
     c.setPosition(m_doc->findBlockByNumber(b - 1).position() + m_doc->findBlockByNumber(b - 1).length() - 1, QTextCursor::KeepAnchor);
     c.insertText(rewritten.join("\n"));
-    const QTextBlock s = m_doc->findBlockByNumber(newFirst);
-    const QTextBlock e = m_doc->findBlockByNumber(newFirst + (last - first) - 1);
+    for (int fb : foldedNow)
+        m_folds.append(QTextCursor(m_doc->findBlockByNumber(fb)));
     refresh();
-    emit moved(s.position(), e.position() + e.length() - 1);
+    if (caretLine >= 0) {
+        const QTextBlock nb = m_doc->findBlockByNumber(newFirst + caretLine);
+        const int position = nb.position() + qBound(0, caretColumn + indentChange, qMax(nb.length() - 1, 0));
+        emit cursorRequested(position);
+        keepCaretVisible(position); // into a folded project: the caret waits on the folded line instead
+    }
 }
 
 void Backend::moveLines(int start, int end, int direction) {

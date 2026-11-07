@@ -32,11 +32,13 @@ ApplicationWindow {
     property bool moveOpen: false
     property int moveStart: 0
     property int moveEnd: 0
+    property int moveCaret: 0
     property var moveItems: []
     property var moveShown: moveItems.filter(item => item.label.toLowerCase().indexOf(moveField.text.toLowerCase()) >= 0)
     function openMove() {
         moveStart = editor.selectionStart
         moveEnd = editor.selectionEnd
+        moveCaret = editor.cursorPosition
         moveItems = backend.moveTargets(moveStart, moveEnd)
         moveField.text = ""
         moveList.currentIndex = 0
@@ -50,7 +52,7 @@ ApplicationWindow {
     function chooseMove(index) {
         if (index < 0 || index >= moveShown.length)
             return
-        backend.moveToProject(moveStart, moveEnd, moveShown[index].block)
+        backend.moveToProject(moveStart, moveEnd, moveShown[index].block, moveCaret)
         closeMove()
     }
     property bool findVisible: false
