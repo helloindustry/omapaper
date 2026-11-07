@@ -54,6 +54,7 @@ public:
     // With a single AND-group, an item that satisfies one of its `not` terms is filtered out along with everything
     // under it (TaskPaper needs `except @tag//*` for that; here `not @tag` does it).
     bool excludes(const Item &item) const;
+    QStringList textTerms() const; // the plain words being searched for, for highlighting
 
 private:
     struct Predicate {

@@ -148,6 +148,16 @@ Query Query::parse(const QString &text) {
     return query;
 }
 
+QStringList Query::textTerms() const {
+    QStringList words;
+    for (const auto &group : m_groups)
+        for (const auto &p : group)
+            if (p.kind == Predicate::Text && !p.negate)
+                words << p.value.split(' ', Qt::SkipEmptyParts);
+    words.removeDuplicates();
+    return words;
+}
+
 bool Query::test(const Predicate &p, const Item &item) const {
     if (p.kind == Predicate::Tag) {
         if (!item.hasTag(p.name))

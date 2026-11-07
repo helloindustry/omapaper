@@ -626,6 +626,8 @@ void Backend::refresh() {
 
     QVector<bool> visible(n, true);
     const Query query = Query::parse(m_query);
+    if (m_highlighter)
+        m_highlighter->setSearchTerms(query.textTerms());
     if (!query.isEmpty()) {
         visible.fill(false);
         for (int i = 0; i < n; ++i) {

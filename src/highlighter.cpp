@@ -9,6 +9,13 @@ void Highlighter::setColors(const QColor &accent, const QColor &muted) {
     rehighlight();
 }
 
+void Highlighter::setSearchTerms(const QStringList &terms) {
+    if (terms == m_terms)
+        return;
+    m_terms = terms;
+    rehighlight();
+}
+
 void Highlighter::setHover(int start, int end) {
     if (start == m_hoverStart && end == m_hoverEnd)
         return;
@@ -159,6 +166,17 @@ void Highlighter::highlightBlock(const QString &text) {
     for (const auto &tag : item.tags)
         skip.append({tag.start, tag.length});
     markdown(text, item.type == Item::Task ? item.textStart : item.bodyStart, skip);
+
+    for (const QString &term : m_terms) {
+        for (int at = text.indexOf(term, item.bodyStart, Qt::CaseInsensitive); at >= 0;
+             at = text.indexOf(term, at + term.size(), Qt::CaseInsensitive)) {
+            for (int i = at; i < at + term.size(); ++i) {
+                QTextCharFormat found = format(i);
+                found.setForeground(m_accent);
+                setFormat(i, 1, found);
+            }
+        }
+    }
 
     if (m_hoverStart >= 0) {
         const int base = currentBlock().position();
