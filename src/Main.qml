@@ -1056,8 +1056,8 @@ ApplicationWindow {
             anchors.leftMargin: win.sidebarVisible ? backend.sidebarWidth : 0 // only under the editor
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            height: win.barHeight // one regular line, shaded like a highlighted line
-            color: Qt.alpha(theme.selection, 0.45)
+            height: Math.round(win.fs * 3.6) // the same bar as the search bar at the top
+            color: theme.sidebar
             opacity: active ? 1 : 0
             visible: opacity > 0
             Behavior on opacity { NumberAnimation { duration: 180 } }
@@ -1067,13 +1067,13 @@ ApplicationWindow {
             }
             Text {
                 anchors.fill: parent
-                anchors.leftMargin: 32
+                anchors.leftMargin: 16
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
                 text: win.deleteBlock >= 0 ? qsTr("Delete “%1”?  y / n").arg(win.deleteName) : toast.shownText
                 font.family: backend.fontFamily
-                font.pointSize: win.fs
-                color: theme.muted
+                font.pointSize: win.fs - 0.75
+                color: theme.foreground
             }
         }
 
