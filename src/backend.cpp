@@ -1500,10 +1500,12 @@ void Backend::moveLines(int start, int end, int direction) {
     const int level = parseLine(m_doc->findBlockByNumber(first).text()).indent;
     int otherFirst, otherLast;
     if (direction < 0) {
+        // The previous sibling is the nearest line above at this item's level, skipping over its children
+        // (folded or not). Reaching a shallower line first means there is no sibling: the item stays put.
         otherFirst = -1;
         for (int i = first - 1; i >= 0; --i) {
             const Item item = parseLine(m_doc->findBlockByNumber(i).text());
-            if (item.type == Item::Blank) continue;
+            if (item.type == Item::Blank || item.indent > level) continue;
             if (item.indent == level) otherFirst = i;
             break;
         }
@@ -1527,10 +1529,25 @@ void Backend::moveLines(int start, int end, int direction) {
     const QString mine = text(first, last), other = text(otherFirst, otherLast);
     const QString swapped = direction < 0 ? mine + "\n" + other : other + "\n" + mine;
 
+    // Folds travel with their items: note which lines in the span are folded, and put the folds back on
+    // the lines' new positions after the rewrite, so moving never opens or closes anything.
+    const int lenMine = last - first, lenOther = otherLast - otherFirst;
+    const int newStart = direction < 0 ? a : a + lenOther;
+    const int otherStart = direction < 0 ? a + lenMine : a;
+    QList<int> foldedNow;
+    for (int f = m_folds.size() - 1; f >= 0; --f) {
+        const int fb = m_folds[f].blockNumber();
+        if (fb < a || fb >= b) continue;
+        foldedNow << (fb >= first && fb < last ? newStart + (fb - first) : otherStart + (fb - otherFirst));
+        m_folds.removeAt(f);
+    }
+
     QTextCursor c(m_doc->findBlockByNumber(a));
     c.setPosition(m_doc->findBlockByNumber(b - 1).position() + m_doc->findBlockByNumber(b - 1).length() - 1, QTextCursor::KeepAnchor);
     c.insertText(swapped);
-    const int newStart = direction < 0 ? a : a + other.count('\n') + 1;
+    for (int fb : foldedNow)
+        m_folds.append(QTextCursor(m_doc->findBlockByNumber(fb)));
+    refresh();
     const QTextBlock s = m_doc->findBlockByNumber(newStart);
     const QTextBlock e = m_doc->findBlockByNumber(newStart + (last - first) - 1);
     emit moved(s.position(), e.position() + e.length() - 1);
