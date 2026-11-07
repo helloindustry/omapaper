@@ -75,7 +75,8 @@ public:
     Q_INVOKABLE void showAll();                      // back to the full document
     Q_INVOKABLE void toggleFold(int position);
     Q_INVOKABLE void toggleFoldBlock(int block);
-    Q_INVOKABLE void foldAll(bool collapse);
+    Q_INVOKABLE void foldAll(bool collapse, int position = -1); // position: the caret, kept where it is unless a fold hides its line
+    void keepCaretVisible(int position);
     Q_INVOKABLE bool shiftHeld() const; // Qt matches Ctrl+Shift+key to a plain Ctrl+key shortcut, so those ask
     Q_INVOKABLE void foldItems(int start, int end, bool collapse, bool completely); // TaskPaper's Expand/Collapse Items
     Q_INVOKABLE void toggleFoldAll(); // unfolds if everything is folded, otherwise folds everything

@@ -912,7 +912,6 @@ void Backend::foldItems(int start, int end, bool collapse, bool completely) {
     if (!m_doc)
         return;
     const auto range = blockRange(start, end);
-    int caretBlock = range.first;
     for (int i = range.first; i <= range.second; ++i) {
         int base = i;
         if (collapse && !hasChildren(i)) {
@@ -920,8 +919,6 @@ void Backend::foldItems(int start, int end, bool collapse, bool completely) {
             base = enclosingParent(i);
             if (base < 0)
                 continue;
-            if (i == range.first)
-                caretBlock = base;
         }
         QList<int> targets{base};
         if (completely)
@@ -937,10 +934,8 @@ void Backend::foldItems(int start, int end, bool collapse, bool completely) {
                 m_folds.removeAt(at);
         }
     }
-    if (collapse) {
-        const QTextBlock b = m_doc->findBlockByNumber(caretBlock);
-        emit cursorRequested(b.position() + b.length() - 1);
-    }
+    if (collapse)
+        keepCaretVisible(start);
     refresh();
     persistCursor();
 }
@@ -958,13 +953,32 @@ void Backend::toggleFoldAll() {
     foldAll(!(any && allFolded));
 }
 
-void Backend::foldAll(bool collapse) {
+// Leave the caret exactly where it is. Only when a fold now hides its line does it move, to the fold's line, same column.
+void Backend::keepCaretVisible(int position) {
+    if (!m_doc || position < 0)
+        return;
+    const QTextBlock cb = m_doc->findBlock(position);
+    if (!cb.isValid())
+        return;
+    int hider = -1;
+    for (const auto &fold : m_folds) {
+        const int fb = fold.blockNumber();
+        if (fb < cb.blockNumber() && cb.blockNumber() < foldEnd(fb) && (hider < 0 || fb < hider))
+            hider = fb;
+    }
+    if (hider < 0)
+        return;
+    const QTextBlock hb = m_doc->findBlockByNumber(hider);
+    emit cursorRequested(hb.position() + qMin(position - cb.position(), qMax(hb.length() - 1, 0)));
+}
+
+void Backend::foldAll(bool collapse, int position) {
     m_folds.clear();
     if (collapse)
         for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next())
             if (hasChildren(b.blockNumber()))
                 m_folds.append(QTextCursor(b));
-    emit cursorRequested(0);
+    keepCaretVisible(position);
     refresh();
     persistCursor();
 }
