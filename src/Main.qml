@@ -11,6 +11,8 @@ ApplicationWindow {
     minimumHeight: 320
     visible: true
     title: backend.title + " — TaskPaper"
+    readonly property color caretColor: "#00b3ff" // iA Writer caret blue, sampled from the app
+    readonly property real caretWidth: 2.5
     color: theme.background
 
     Material.theme: theme.dark ? Material.Dark : Material.Light
@@ -365,6 +367,11 @@ ApplicationWindow {
                         color: theme.foreground
                         selectionColor: theme.accent
                         selectedTextColor: theme.accentForeground
+                        // The one non-stock touch: a blue caret, a hair thicker than the default.
+                        cursorDelegate: Rectangle {
+                            width: win.caretWidth
+                            color: win.caretColor
+                        }
                         leftPadding: 32
                         rightPadding: 24
                         topPadding: 16
@@ -456,9 +463,9 @@ ApplicationWindow {
                                 readonly property rect line: { editor.contentHeight; editor.width; return editor.positionToRectangle(modelData) }
                                 x: line.x
                                 y: line.y
-                                width: 2
+                                width: win.caretWidth
                                 height: line.height
-                                color: theme.accent
+                                color: win.caretColor
                                 SequentialAnimation on opacity {
                                     loops: Animation.Infinite
                                     NumberAnimation { to: 0; duration: 530 }
