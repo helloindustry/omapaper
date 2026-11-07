@@ -260,6 +260,9 @@ QVariantList Backend::lineRange(int position) const {
     return {b.position(), b.position() + b.length() - 1}; // the line's text, up to but not into the next line
 }
 
+bool Backend::caretThemed() const { return QSettings("taskpaper", "taskpaper").value("caretThemed", true).toBool(); }
+void Backend::setCaretThemed(bool themed) { QSettings("taskpaper", "taskpaper").setValue("caretThemed", themed); }
+
 void Backend::saveSidebarWidth() { QSettings("taskpaper", "taskpaper").setValue("sidebarWidth", m_sidebarWidth); }
 
 bool Backend::sidebarShown() const { return QSettings("taskpaper", "taskpaper").value("sidebarShown", true).toBool(); }
@@ -650,6 +653,15 @@ void Backend::refresh() {
     // The pinned line (the one just typed on) stays visible against a search, but never against a fold.
     if (!m_pin.isNull() && m_pin.blockNumber() < n)
         visible[m_pin.blockNumber()] = true;
+
+    // Saved searches show only in the sidebar, never in the editor.
+    // The empty line at the very end stays, so the caret never ends up inside the hidden part.
+    int lastContent = n - 1;
+    while (lastContent >= 0 && items[lastContent].type == Item::Blank)
+        --lastContent;
+    for (int i = 0; i < n; ++i)
+        if (inSearches[i] && i <= lastContent)
+            visible[i] = false;
 
     // Folding rule: the lines directly beneath an item that are indented deeper belong to it and fold with it.
     // The first line that is not indented deeper, empty lines included, ends them.

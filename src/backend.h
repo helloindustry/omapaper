@@ -55,6 +55,8 @@ public:
     Q_INVOKABLE void save();
     Q_INVOKABLE void saveNow(); // Ctrl+S: saves, and says so even when autosave had already written everything
     Q_INVOKABLE void saveSidebarWidth();
+    Q_INVOKABLE bool caretThemed() const; // false means the iA blue caret; the theme's accent is the default
+    Q_INVOKABLE void setCaretThemed(bool themed);
     Q_INVOKABLE QVariantList lineRange(int position) const; // the line's own text
     Q_INVOKABLE void toggleTagFold(const QString &name);
     Q_INVOKABLE bool sidebarShown() const;

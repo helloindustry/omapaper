@@ -11,7 +11,7 @@ ApplicationWindow {
     minimumHeight: 320
     visible: true
     title: backend.title + " — TaskPaper"
-    property bool caretThemed: false // toggled by an undocumented shortcut
+    property bool caretThemed: backend.caretThemed() // the theme's accent by default; an undocumented shortcut switches to the blue, and it is remembered
     readonly property color caretColor: caretThemed ? theme.accent : "#00b3ff" // iA Writer caret blue, sampled from the app
     readonly property real caretWidth: 2.2
     color: theme.background
@@ -20,10 +20,14 @@ ApplicationWindow {
     Material.accent: theme.accent
     Material.roundedScale: theme.radius
 
-    readonly property real fs: backend.fontSize // the size everything else scales from
+    readonly property real fs: backend.fontSize
+    FontMetrics { id: lineMetrics; font.family: backend.fontFamily; font.pointSize: win.fs }
+    readonly property real barHeight: Math.ceil(lineMetrics.lineSpacing) // one regular line // the size everything else scales from
     property bool sidebarVisible: backend.sidebarShown() // remembered between runs
     onSidebarVisibleChanged: backend.setSidebarShown(sidebarVisible)
     property bool helpVisible: false
+    property int deleteBlock: -1 // a saved search waiting on y/n
+    property string deleteName: ""
     // The "move to project" list: what was selected when it opened, and the projects it can go to.
     property bool moveOpen: false
     property int moveStart: 0
@@ -155,7 +159,7 @@ ApplicationWindow {
     // and the single-letter keys of Omarchy's own apps (Q, ?) would type into the document, so they are Ctrl+Q and Ctrl+/.
     // Every key is Ctrl+key or Ctrl+Shift+key: TaskPaper's where known, otherwise the nearest free one.
     // Omarchy's own bindings all use Super, so none of these collide with it.
-    Shortcut { sequence: "Ctrl+Alt+Shift+C"; context: Qt.ApplicationShortcut; onActivated: win.caretThemed = !win.caretThemed }
+    Shortcut { sequence: "Ctrl+Alt+Shift+C"; context: Qt.ApplicationShortcut; onActivated: { win.caretThemed = !win.caretThemed; backend.setCaretThemed(win.caretThemed) } }
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
     Shortcut { sequence: "Ctrl+Shift+M"; context: Qt.ApplicationShortcut; onActivated: win.openMove() }
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
@@ -218,6 +222,34 @@ ApplicationWindow {
                     model: backend.sidebar
                     boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: ScrollBar {}
+
+                    // After a saved search is clicked, Delete asks "Delete? y/n" in the bottom bar. y deletes; n or Esc cancels.
+                    onActiveFocusChanged: if (!activeFocus) win.deleteBlock = -1
+                    Keys.onPressed: event => {
+                        if (win.deleteBlock >= 0) {
+                            if (event.key === Qt.Key_Y) backend.deleteBlock(win.deleteBlock)
+                            if (event.key === Qt.Key_Y || event.key === Qt.Key_N || event.key === Qt.Key_Escape) {
+                                win.deleteBlock = -1
+                                editor.forceActiveFocus()
+                            }
+                            event.accepted = true
+                            return
+                        }
+                        if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
+                            for (const r of backend.sidebar)
+                                if (r.kind === "search" && r.query === backend.query) {
+                                    win.deleteBlock = r.block
+                                    win.deleteName = r.label
+                                    event.accepted = true
+                                    return
+                                }
+                        }
+                        // Anything else is for the editor: hand focus back and pass typed text along.
+                        editor.forceActiveFocus()
+                        if (event.text.length > 0 && event.text.charCodeAt(0) >= 32 && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier)))
+                            editor.insert(editor.cursorPosition, event.text)
+                        event.accepted = event.key !== Qt.Key_Escape
+                    }
 
                     delegate: Item {
                         id: row
@@ -287,17 +319,8 @@ ApplicationWindow {
                             onTapped: {
                                 if (row.modelData.kind === "all") backend.showAll()
                                 else if (row.modelData.kind === "project") backend.showProject(row.modelData.block)
-                                else backend.search(row.modelData.query)
+                                else { backend.search(row.modelData.query); if (row.modelData.kind === "search") list.forceActiveFocus() }
                             }
-                        }
-                        TapHandler {
-                            acceptedButtons: Qt.RightButton
-                            enabled: row.modelData.kind === "search"
-                            onTapped: menu.popup()
-                        }
-                        Menu {
-                            id: menu
-                            MenuItem { text: qsTr("Delete Search"); onTriggered: backend.deleteBlock(row.modelData.block) }
                         }
                     }
                 }
@@ -399,7 +422,7 @@ ApplicationWindow {
                         leftPadding: 32
                         rightPadding: 24
                         topPadding: 22
-                        bottomPadding: 22
+                        bottomPadding: win.barHeight + 14 // room for the status bar, which sits inside this margin
                         // A property read, so the width follows the font size when it changes (a method call would not be re-evaluated).
                         tabStopDistance: fontMetrics.averageCharacterWidth * 2
                         persistentSelection: true
@@ -869,14 +892,15 @@ ApplicationWindow {
         Rectangle {
             id: toast
             property string shownText: ""
-            readonly property bool active: backend.notice !== "" && backend.error === ""
+            readonly property bool active: (backend.notice !== "" || win.deleteBlock >= 0) && backend.error === ""
             z: 5
             anchors.left: parent.left
             anchors.leftMargin: win.sidebarVisible ? backend.sidebarWidth : 0 // only under the editor
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            height: Math.round(win.fs * 1.7)
-            color: Qt.alpha(theme.sidebar, 0.92)
+            anchors.bottomMargin: 6
+            height: win.barHeight // one regular line, shaded like a highlighted line
+            color: theme.selection
             opacity: active ? 1 : 0
             visible: opacity > 0
             Behavior on opacity { NumberAnimation { duration: 180 } }
@@ -886,13 +910,13 @@ ApplicationWindow {
             }
             Text {
                 anchors.fill: parent
-                anchors.leftMargin: 16
+                anchors.leftMargin: 32
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
-                text: toast.shownText
+                text: win.deleteBlock >= 0 ? qsTr("Delete “%1”?  y / n").arg(win.deleteName) : toast.shownText
                 font.family: backend.fontFamily
-                font.pointSize: win.fs - 2
-                color: theme.muted
+                font.pointSize: win.fs
+                color: theme.foreground
             }
         }
 
