@@ -78,7 +78,7 @@ public:
     Q_INVOKABLE void foldAll(bool collapse);
     Q_INVOKABLE bool shiftHeld() const; // Qt matches Ctrl+Shift+key to a plain Ctrl+key shortcut, so those ask
     Q_INVOKABLE void foldItems(int start, int end, bool collapse, bool completely); // TaskPaper's Expand/Collapse Items
-    Q_INVOKABLE void toggleFoldAll(); // unfolds if anything is folded, otherwise folds everything
+    Q_INVOKABLE void toggleFoldAll(); // unfolds if everything is folded, otherwise folds everything
     Q_INVOKABLE void zoomToBlock(int block);
     Q_INVOKABLE void zoomIn(int position);
     Q_INVOKABLE void zoomOut();

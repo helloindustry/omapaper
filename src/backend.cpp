@@ -946,7 +946,16 @@ void Backend::foldItems(int start, int end, bool collapse, bool completely) {
 
 bool Backend::shiftHeld() const { return QGuiApplication::keyboardModifiers() & Qt::ShiftModifier; }
 
-void Backend::toggleFoldAll() { foldAll(m_folds.isEmpty()); }
+void Backend::toggleFoldAll() {
+    // Expand only when every foldable item is already folded; otherwise fold everything.
+    bool allFolded = true, any = false;
+    for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next())
+        if (hasChildren(b.blockNumber())) {
+            any = true;
+            if (foldIndex(b.blockNumber()) < 0) { allFolded = false; break; }
+        }
+    foldAll(!(any && allFolded));
+}
 
 void Backend::foldAll(bool collapse) {
     m_folds.clear();
