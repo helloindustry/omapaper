@@ -547,7 +547,7 @@ ApplicationWindow {
                         leftPadding: 32
                         rightPadding: 24
                         topPadding: 22
-                        bottomPadding: win.barHeight + 14 // room for the status bar, which sits inside this margin
+                        bottomPadding: win.barHeight + 6 // the status bar is flush with the window's bottom edge and doubles as the margin
                         // A property read, so the width follows the font size when it changes (a method call would not be re-evaluated).
                         tabStopDistance: fontMetrics.averageCharacterWidth * 2
                         persistentSelection: true
@@ -1034,7 +1034,6 @@ ApplicationWindow {
             anchors.leftMargin: win.sidebarVisible ? backend.sidebarWidth : 0 // only under the editor
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 6
             height: win.barHeight // one regular line, shaded like a highlighted line
             color: Qt.alpha(theme.selection, 0.45)
             opacity: active ? 1 : 0
