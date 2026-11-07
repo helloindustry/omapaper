@@ -998,7 +998,8 @@ ApplicationWindow {
                 row[2]()
             }
             onVisibleChanged: { reset(); if (visible) forceActiveFocus() }
-            onFilterChanged: picked = -1
+            // The first match is picked as soon as there is a filter, so Enter alone runs it.
+            function setFilter(text) { filter = text; picked = text === "" || shown.length === 0 ? -1 : 0; helpList.positionViewAtBeginning() }
 
             Keys.onEscapePressed: dismiss()
             Keys.onPressed: (event) => {
@@ -1006,16 +1007,16 @@ ApplicationWindow {
                     picked = Math.min(shown.length - 1, picked + 1)
                     helpList.positionViewAtIndex(picked, ListView.Contain)
                 } else if (event.key === Qt.Key_Up) {
-                    picked = Math.max(-1, picked - 1)
+                    picked = Math.max(filter === "" ? -1 : 0, picked - 1)
                     if (picked >= 0)
                         helpList.positionViewAtIndex(picked, ListView.Contain)
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     run()
                 } else if (event.key === Qt.Key_Backspace) {
-                    filter = filter.slice(0, -1)
+                    setFilter(filter.slice(0, -1))
                 } else if (event.text.length > 0 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127
                            && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
-                    filter += event.text
+                    setFilter(filter + event.text)
                 } else {
                     return
                 }
