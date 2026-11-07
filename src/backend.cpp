@@ -22,6 +22,8 @@
 #include <QRandomGenerator>
 #include <QSaveFile>
 #include <QSettings>
+#include <QStringDecoder>
+#include <QCoreApplication>
 #include <QTextBlock>
 #include <QUrl>
 
@@ -128,13 +130,17 @@ void Backend::load(const QString &requested) {
     // Always absolute, so the remembered file still resolves when the app is next started from somewhere else.
     const QString path = QFileInfo(requested).absoluteFilePath();
     QString text;
+    bool notUtf8 = false;
     QFile file(path);
     if (file.exists()) {
         if (!file.open(QIODevice::ReadOnly)) {
             setError(tr("Can't read %1").arg(path));
             return;
         }
-        text = QString::fromUtf8(file.readAll()).replace("\r\n", "\n");
+        // A file that isn't UTF-8 would come back with damaged characters if we saved it, so it is never written.
+        QStringDecoder decoder(QStringDecoder::Utf8);
+        text = QString(decoder(file.readAll())).replace("\r\n", "\n");
+        notUtf8 = decoder.hasError();
     }
     m_applying = true;
     m_doc->setPlainText(text);
@@ -161,7 +167,9 @@ void Backend::load(const QString &requested) {
         m_collapsedTags.insert(name);
     m_pin = QTextCursor();
     QSettings("taskpaper", "taskpaper").setValue("lastFile", path);
-    setError({});
+    m_notUtf8 = notUtf8;
+    m_readOnly = notUtf8 || (file.exists() && !QFileInfo(path).isWritable());
+    setError(m_readOnly ? readOnlyMessage() : QString());
     emit fileChanged();
     emit zoomChanged();
     refresh();
@@ -378,10 +386,17 @@ void Backend::save() {
     const QString text = m_doc->toPlainText();
     if (text.isEmpty() && !QFileInfo::exists(m_path))
         return;
+    // A read-only file is left alone, even though replacing it through a temporary file would work.
+    if (!m_readOnly && QFileInfo::exists(m_path) && !QFileInfo(m_path).isWritable())
+        m_readOnly = true;
+    if (m_readOnly) {
+        setError(readOnlyMessage());
+        return;
+    }
     QDir().mkpath(QFileInfo(m_path).absolutePath());
     QSaveFile file(m_path);
     if (!file.open(QIODevice::WriteOnly) || file.write(text.toUtf8()) < 0 || !file.commit()) {
-        setError(tr("Can't save %1").arg(m_path));
+        setError(tr("Can't save %1. Ctrl+Shift+S saves it somewhere else.").arg(QFileInfo(m_path).fileName()));
         return;
     }
     m_dirty = false;
@@ -389,10 +404,35 @@ void Backend::save() {
     showNotice(tr("Saved"), 1500);
 }
 
+QString Backend::readOnlyMessage() const {
+    return m_notUtf8 ? tr("%1 isn't UTF-8 text, so it is shown but never saved. Ctrl+Shift+S saves a copy.").arg(QFileInfo(m_path).fileName())
+                   : tr("%1 is read-only, so changes aren't saved. Ctrl+Shift+S saves a copy.").arg(QFileInfo(m_path).fileName());
+}
+
+// On the way out, anything that still couldn't reach its file is kept beside the app's data, and a desktop
+// notification says where, so quitting never throws work away.
+void Backend::saveOnQuit() {
+    save();
+    if (!m_doc || !m_dirty || m_path.isEmpty())
+        return;
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/unsaved";
+    QDir().mkpath(dir);
+    const QFileInfo info(m_path);
+    const QString rescue = dir + "/" + info.completeBaseName() + "-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + "."
+                           + (info.suffix().isEmpty() ? "taskpaper" : info.suffix());
+    QSaveFile out(rescue);
+    if (out.open(QIODevice::WriteOnly) && out.write(m_doc->toPlainText().toUtf8()) >= 0 && out.commit())
+        QProcess::startDetached("notify-send", {"-a", "ompaper", tr("Couldn't save %1").arg(info.fileName()), tr("Your text was kept in %1").arg(rescue)});
+}
+
 void Backend::saveNow() {
     save();
     if (!m_path.isEmpty() && m_error.isEmpty())
         showNotice(tr("Saved"), 1500);
+}
+
+void Backend::newWindow() {
+    QProcess::startDetached(QCoreApplication::applicationFilePath(), {"--pick"});
 }
 
 // The open dialog is the desktop's own, reached through xdg-desktop-portal.
@@ -441,8 +481,16 @@ void Backend::externalChange() {
     if (!m_doc || m_path.isEmpty())
         return;
     QFile file(m_path);
-    if (!file.open(QIODevice::ReadOnly))
-        return; // being replaced; the folder watch fires again when it is back
+    if (!file.open(QIODevice::ReadOnly)) {
+        // Being replaced, and the folder watch fires again when it is back. If it never comes back, say so once;
+        // the next edit writes the file afresh.
+        if (!QFileInfo::exists(m_path) && !m_missingNoted) {
+            m_missingNoted = true;
+            showNotice(tr("%1 was moved or deleted. Your next edit saves it again.").arg(QFileInfo(m_path).fileName()), 5000);
+        }
+        return;
+    }
+    m_missingNoted = false;
     const QString remote = QString::fromUtf8(file.readAll()).replace("\r\n", "\n");
     file.close();
     if (remote == m_disk)
@@ -525,6 +573,9 @@ void Backend::saveAsResponse(uint code, const QVariantMap &results) {
     QSettings("taskpaper", "taskpaper").setValue("lastFile", m_path);
     QFile(m_path).open(QIODevice::WriteOnly | QIODevice::Append); // creates it, so an empty document still gets a file
     m_disk.clear();
+    m_readOnly = false;
+    m_notUtf8 = false;
+    setError({});
     m_dirty = true;
     save();
     emit fileChanged();
@@ -1520,6 +1571,41 @@ void Backend::deleteLines(int start, int end) {
     c.removeSelectedText();
 }
 
+// Copies the selected items, children and all, just below themselves and moves the caret onto the copy.
+// A folded item's copy is folded too, so the document looks the same apart from the extra lines.
+void Backend::duplicateLines(int start, int end) {
+    if (!m_doc)
+        return;
+    const auto range = blockRange(start, end);
+    int last = qMax(range.second, subtreeEnd(range.second) - 1);
+    for (int i = range.first; i <= last; ++i)
+        if (foldIndex(i) >= 0)
+            last = qMax(last, foldEnd(i) - 1);
+    while (last > range.second && parseLine(m_doc->findBlockByNumber(last).text()).type == Item::Blank)
+        --last;
+    QStringList lines;
+    for (int i = range.first; i <= last; ++i)
+        lines << m_doc->findBlockByNumber(i).text();
+    const int count = last - range.first + 1;
+    const int column = start - m_doc->findBlockByNumber(range.first).position();
+
+    QVector<int> folded;
+    for (int i = range.first; i <= last; ++i)
+        if (foldIndex(i) >= 0)
+            folded << i;
+
+    QTextCursor c(m_doc);
+    c.beginEditBlock();
+    const QTextBlock to = m_doc->findBlockByNumber(last);
+    c.setPosition(to.position() + to.length() - 1);
+    c.insertText("\n" + lines.join('\n'));
+    c.endEditBlock();
+    for (int i : folded)
+        m_folds.append(QTextCursor(m_doc->findBlockByNumber(i + count)));
+    refresh(); // the new lines must not show for a moment inside a fold
+    emit cursorRequested(m_doc->findBlockByNumber(range.first + count).position() + column);
+}
+
 // Moves items under an "Archive:" project at the bottom of the file, the way TaskPaper does: they go in at
 // the top of the project, keep their children, tags and @done, and gain @project(Parent / Child) naming
 // where they came from. With nothing selected it archives every @done item, as TaskPaper's command does.
@@ -1623,12 +1709,11 @@ void Backend::archive(int start, int end) {
 // Moves the selected lines, with their children, past the neighbouring item at the same level.
 // The projects a selection could be moved into: every project except those inside the selection itself,
 // the Searches project, and saved searches.
-QVariantList Backend::moveTargets(int start, int end) const {
+// Every project in the file with its depth, minus saved searches; skipFrom..skipTo (lines) are left out.
+QVariantList Backend::projectList(int skipFrom, int skipTo) const {
     QVariantList targets;
     if (!m_doc)
         return targets;
-    const auto range = blockRange(start, end);
-    const int chunkEnd = subtreeEnd(range.second);
     int searchesEnd = -1;
     for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next()) {
         const int n = b.blockNumber();
@@ -1637,12 +1722,21 @@ QVariantList Backend::moveTargets(int start, int end) const {
             searchesEnd = subtreeEnd(n);
         if (item.type != Item::Project || item.hasTag("search") || (searchesEnd > n))
             continue;
-        if (n >= range.first && n < chunkEnd)
+        if (n >= skipFrom && n < skipTo)
             continue;
         targets << QVariantMap{{"label", item.title}, {"level", item.indent / 4}, {"block", n}};
     }
     return targets;
 }
+
+QVariantList Backend::moveTargets(int start, int end) const {
+    if (!m_doc)
+        return {};
+    const auto range = blockRange(start, end);
+    return projectList(range.first, subtreeEnd(range.second));
+}
+
+QVariantList Backend::projectTargets() const { return projectList(0, 0); }
 
 // Moves the selected items, and everything beneath them, to the end of a project, indented to sit inside it.
 void Backend::moveToProject(int start, int end, int targetBlock, int caret) {

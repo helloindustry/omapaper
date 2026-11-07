@@ -49,10 +49,14 @@ public:
 
     Q_INVOKABLE void attach(QQuickTextDocument *document);
     Q_INVOKABLE void openDialog();
+    Q_INVOKABLE void newWindow(); // another copy of the app, which asks which file to open
     Q_INVOKABLE void saveAsDialog();
     Q_INVOKABLE void changeFontSize(double delta); // 0 resets to the default
     Q_INVOKABLE void openPath(const QString &path);
     Q_INVOKABLE void save();
+    void saveOnQuit(); // save, and keep a rescue copy if the file can't be written
+    QString readOnlyMessage() const;
+    QVariantList projectList(int skipFrom, int skipTo) const;
     Q_INVOKABLE void saveNow(); // Ctrl+S: saves, and says so even when autosave had already written everything
     Q_INVOKABLE void saveSidebarWidth();
     Q_INVOKABLE bool caretThemed() const; // false means the iA blue caret; the theme's accent is the default
@@ -105,8 +109,10 @@ public:
     Q_INVOKABLE bool newline(int position);
     Q_INVOKABLE void indent(int start, int end, int direction);
     Q_INVOKABLE void toggleDone(int start, int end);
+    Q_INVOKABLE void duplicateLines(int start, int end); // copies the lines touched, plus their children, just below them
     Q_INVOKABLE void deleteLines(int start, int end); // the lines touched by the selection, plus anything folded inside them
     Q_INVOKABLE void archive(int start, int end); // the selection, or every @done item when nothing is selected
+    Q_INVOKABLE QVariantList projectTargets() const; // every project, for "go to project"
     Q_INVOKABLE QVariantList moveTargets(int start, int end) const; // projects the selected items could move into
     Q_INVOKABLE void moveToProject(int start, int end, int targetBlock, int caret = -1); // folds stay as they were; the caret keeps its place within the moved item
     Q_INVOKABLE void moveLines(int start, int end, int direction);
@@ -151,6 +157,9 @@ private:
 
     Theme *m_theme;
     QString m_initialFile, m_path, m_query, m_error, m_notice;
+    bool m_notUtf8 = false;
+    bool m_readOnly = false;    // read-only on disk, or not UTF-8: shown, never written
+    bool m_missingNoted = false;
     QTextDocument *m_doc = nullptr;
     Highlighter *m_highlighter = nullptr;
     QTextCursor m_zoom, m_pin; // cursors, so they follow the lines as text is edited

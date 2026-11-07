@@ -45,6 +45,33 @@ private slots:
         QVERIFY(Query::parse("task b").matches(open));
         QVERIFY(Query::parse("project Inbox").matches(parseLine("Inbox:")));
     }
+
+    void dateWords()
+    {
+        const QDate today = QDate::currentDate();
+        const auto at = [&](const QDate &d) { return parseLine("- x @due(" + d.toString("yyyy-MM-dd") + ")"); };
+        const auto day = [&](const QString &q, const QDate &d) { return Query::parse(q).matches(at(d)); };
+        QVERIFY(day("@due = today", today));
+        QVERIFY(day("@due = tomorrow", today.addDays(1)));
+        QVERIFY(day("@due = today + 1 week", today.addDays(7)));
+        QVERIFY(day("@due <= today + 2 days", today.addDays(2)));
+        QVERIFY(!day("@due < today", today));
+        QVERIFY(day("@due < today", today.addDays(-1)));
+        QVERIFY(day("@due > yesterday", today));
+        // "next Monday" is always 1 to 7 days ahead and a Monday.
+        const QDate next = today.addDays(7 - today.dayOfWeek() + 1);
+        QVERIFY(day("@due = next Monday", next));
+        QVERIFY(day("@due = monday", today.addDays((1 - today.dayOfWeek() + 7) % 7)));
+        QVERIFY(day("@due = next week", today.addDays(1 - today.dayOfWeek() + 7)));
+        QVERIFY(day("@due = next month", QDate(today.year(), today.month(), 1).addMonths(1)));
+        QVERIFY(day("@due = 2026-06-03", QDate(2026, 6, 3)));
+        QVERIFY(day("@due = June 3", QDate(today.year(), 6, 3)));
+        QVERIFY(day("@due >= Nov 26 3:15 +1 day", QDate(today.year(), 11, 28)));
+        QVERIFY(!day("@due = Nov 26 3:15 +1 day", QDate(today.year(), 11, 26)));
+        // Words stay words.
+        QVERIFY(Query::parse("@name = bob").matches(parseLine("- x @name(bob)")));
+        QVERIFY(Query::parse("@n < 10").matches(parseLine("- x @n(9)")));
+    }
 };
 
 QTEST_MAIN(TaskPaperTests)

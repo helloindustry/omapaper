@@ -78,18 +78,105 @@ Item parseLine(const QString &line) {
     return item;
 }
 
-// Dates compare as dates, numbers as numbers, everything else as lowercase text.
+// Dates compare as dates, numbers as numbers, everything else as lowercase text. A date can be written the way
+// TaskPaper allows: 2026-11-05, today, tomorrow, next Monday, June 3, 3:15pm, +1 week, 2 days, tomorrow 9am,
+// "Nov 26 3:15 +1 day". Anything that is not entirely made of those pieces is not a date.
 static QDateTime toDate(QString s) {
-    s = s.trimmed().toLower();
-    const QDate today = QDate::currentDate();
-    if (s == "today") return QDateTime(today, QTime(0, 0));
-    if (s == "tomorrow") return QDateTime(today.addDays(1), QTime(0, 0));
-    if (s == "yesterday") return QDateTime(today.addDays(-1), QTime(0, 0));
-    for (const char *format : {"yyyy-MM-dd HH:mm", "yyyy-MM-dd"}) {
-        const auto d = QDateTime::fromString(s, format);
-        if (d.isValid()) return d;
+    s = s.trimmed().toLower().simplified();
+    if (s.isEmpty())
+        return {};
+    const QDateTime now = QDateTime::currentDateTime();
+    const QDate today = now.date();
+    static const QRegularExpression year(R"(^\d{4}$)");
+    if (year.match(s).hasMatch())
+        return QDateTime(QDate(s.toInt(), 1, 1), QTime(0, 0));
+
+    static const QStringList weekdays = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"};
+    static const QStringList months = {"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"};
+    static const QRegularExpression isoDay(R"(\G(\d{4})-(\d{1,2})-(\d{1,2})\b)");
+    static const QRegularExpression isoMonth(R"(\G(\d{4})-(\d{1,2})(?![\d-]))");
+    static const QRegularExpression weekday(R"(\G(?:(next|last|this)\s*)?(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b)");
+    static const QRegularExpression period(R"(\G(next|last|this)\s+(week|month|year)\b)");
+    static const QRegularExpression month(R"(\G(?:(next|last|this)\s*)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b(?:\s*(\d{1,2})(?!\d|:|\s*[ap]m\b))?)");
+    static const QRegularExpression keyword(R"(\G(today|tomorrow|yesterday|now)\b)");
+    static const QRegularExpression clock(R"(\G(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b|\G(\d{1,2}):(\d{2})\b)");
+    static const QRegularExpression offset(R"(\G([+-]?)\s*(\d+)\s*(minutes?|mins?|hours?|hrs?|h|days?|d|weeks?|w|months?|mo|years?|y)\b)");
+
+    QDate day = today;
+    bool haveDay = false, haveTime = false;
+    QTime time(0, 0);
+    qint64 seconds = 0;
+    int addDays = 0, addMonths = 0, addYears = 0;
+
+    int pos = 0;
+    while (pos < s.size()) {
+        if (s[pos] == ' ') { ++pos; continue; }
+        QRegularExpressionMatch m;
+        if ((m = isoDay.match(s, pos)).hasMatch()) {
+            day = QDate(m.captured(1).toInt(), m.captured(2).toInt(), m.captured(3).toInt());
+            if (!day.isValid()) return {};
+            haveDay = true;
+        } else if ((m = isoMonth.match(s, pos)).hasMatch()) {
+            day = QDate(m.captured(1).toInt(), m.captured(2).toInt(), 1);
+            if (!day.isValid()) return {};
+            haveDay = true;
+        } else if ((m = period.match(s, pos)).hasMatch()) {
+            const int step = m.captured(1) == "next" ? 1 : m.captured(1) == "last" ? -1 : 0;
+            const QString what = m.captured(2);
+            if (what == "week") day = today.addDays(1 - today.dayOfWeek() + 7 * step); // ISO weeks start on Monday
+            else if (what == "month") day = QDate(today.year(), today.month(), 1).addMonths(step);
+            else day = QDate(today.year() + step, 1, 1);
+            haveDay = true;
+        } else if ((m = weekday.match(s, pos)).hasMatch()) {
+            const int want = weekdays.indexOf(m.captured(2)) + 1;
+            int ahead = (want - today.dayOfWeek() + 7) % 7; // 0 = today
+            if (m.captured(1) == "next" && ahead == 0) ahead = 7;
+            if (m.captured(1) == "last") ahead = ahead == 0 ? -7 : ahead - 7;
+            day = today.addDays(ahead);
+            haveDay = true;
+        } else if ((m = month.match(s, pos)).hasMatch()) {
+            const int number = months.indexOf(m.captured(2)) + 1;
+            int y = today.year();
+            const QString which = m.captured(1);
+            if (which == "next" && QDate(y, number, 1) <= today) ++y;   // the first one still ahead
+            else if (which == "last" && QDate(y, number, 1) >= today) --y; // the most recent one behind
+            const int d = m.captured(3).isEmpty() ? 1 : m.captured(3).toInt();
+            day = QDate(y, number, d);
+            if (!day.isValid()) return {};
+            haveDay = true;
+        } else if ((m = keyword.match(s, pos)).hasMatch()) {
+            const QString k = m.captured(1);
+            day = k == "tomorrow" ? today.addDays(1) : k == "yesterday" ? today.addDays(-1) : today;
+            if (k == "now") { time = QTime(now.time().hour(), now.time().minute()); haveTime = true; }
+            haveDay = true;
+        } else if ((m = clock.match(s, pos)).hasMatch()) {
+            int h = m.captured(3).isEmpty() ? m.captured(4).toInt() : m.captured(1).toInt();
+            const int mins = m.captured(3).isEmpty() ? m.captured(5).toInt() : m.captured(2).toInt();
+            if (!m.captured(3).isEmpty()) {
+                if (h < 1 || h > 12) return {};
+                h = h % 12 + (m.captured(3) == "pm" ? 12 : 0);
+            }
+            time = QTime(h, mins);
+            if (!time.isValid()) return {};
+            haveTime = true;
+        } else if ((m = offset.match(s, pos)).hasMatch()) {
+            const int n = m.captured(2).toInt() * (m.captured(1) == "-" ? -1 : 1);
+            const QString u = m.captured(3);
+            if (u.startsWith("mi")) seconds += n * 60;
+            else if (u == "h" || u.startsWith("ho") || u.startsWith("hr")) seconds += n * 3600;
+            else if (u == "d" || u.startsWith("da")) addDays += n;
+            else if (u == "w" || u.startsWith("we")) addDays += 7 * n;
+            else if (u == "mo" || u.startsWith("mon")) addMonths += n;
+            else addYears += n;
+        } else {
+            return {};
+        }
+        pos += m.capturedLength();
     }
-    return {};
+
+    // Durations alone count from this moment; anything with a day or a time starts from that day's midnight.
+    QDateTime when = haveDay || haveTime ? QDateTime(day, time) : QDateTime(today, QTime(now.time().hour(), now.time().minute()));
+    return when.addYears(addYears).addMonths(addMonths).addDays(addDays).addSecs(seconds);
 }
 
 static int order(const QString &a, const QString &b) {

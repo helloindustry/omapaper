@@ -34,8 +34,20 @@ ApplicationWindow {
     property int moveEnd: 0
     property int moveCaret: 0
     property var moveItems: []
-    property var moveShown: moveItems.filter(item => item.label.toLowerCase().indexOf(moveField.text.toLowerCase()) >= 0)
+    // The same list serves "Go to project" (Ctrl+L), which zooms into the project as clicking it in the sidebar would.
+    property bool moveJump: false
+    // Every typed word has to appear somewhere in the name.
+    property var moveShown: moveItems.filter(item => moveField.text.toLowerCase().split(" ").every(word => item.label.toLowerCase().indexOf(word) >= 0))
+    function openJump() {
+        moveJump = true
+        moveItems = backend.projectTargets()
+        moveField.text = ""
+        moveList.currentIndex = 0
+        moveOpen = true
+        moveField.forceActiveFocus()
+    }
     function openMove() {
+        moveJump = false
         moveStart = editor.selectionStart
         moveEnd = editor.selectionEnd
         moveCaret = editor.cursorPosition
@@ -52,8 +64,12 @@ ApplicationWindow {
     function chooseMove(index) {
         if (index < 0 || index >= moveShown.length)
             return
-        backend.moveToProject(moveStart, moveEnd, moveShown[index].block, moveCaret)
+        const block = moveShown[index].block
         closeMove()
+        if (moveJump)
+            backend.showProject(block)
+        else
+            backend.moveToProject(moveStart, moveEnd, block, moveCaret)
     }
     // Ctrl+Up / Ctrl+Down move the sidebar's selection (Home, projects, tags, saved searches) and open it, as a click would.
     function sidebarCurrent(row) {
@@ -102,6 +118,25 @@ ApplicationWindow {
         list.positionViewAtIndex(next, ListView.Contain)
     }
     property bool findVisible: false
+    property int searchReturn: -1 // where the caret was when the search bar opened; Esc puts it back
+    function openSearch() {
+        if (!search.activeFocus)
+            searchReturn = editor.cursorPosition
+        win.searchOpen = true
+        search.forceActiveFocus()
+        search.selectAll()
+    }
+    function closeSearch() {
+        const back = searchReturn
+        searchReturn = -1
+        backend.query = ""
+        win.searchOpen = false
+        editor.forceActiveFocus()
+        // The document has just reappeared; the caret goes back once it has laid out.
+        if (back >= 0)
+            Qt.callLater(() => { editor.cursorPosition = Math.min(back, editor.length) })
+    }
+    function toggleSearch() { search.activeFocus ? closeSearch() : openSearch() }
     property bool searchOpen: false // the filter bar shows only while it is focused or a search is active
     property string findStatus: ""
 
@@ -212,6 +247,9 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+M"; context: Qt.ApplicationShortcut; onActivated: win.openMove() }
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
+    Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; onActivated: backend.newWindow() }
+    Shortcut { sequence: "Ctrl+L"; context: Qt.ApplicationShortcut; onActivated: win.openJump() }
+    Shortcut { sequence: "F1"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+P"; context: Qt.ApplicationShortcut; onActivated: backend.print() }
     Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveNow() }
     Shortcut { sequence: "Ctrl+Shift+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveAsDialog() }
@@ -220,7 +258,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+F"; context: Qt.ApplicationShortcut; onActivated: win.findVisible ? win.closeFind() : win.openFind() }
     Shortcut { sequence: "Ctrl+G"; context: Qt.ApplicationShortcut; onActivated: win.findAgain(false) }
     Shortcut { sequence: "Ctrl+Shift+G"; context: Qt.ApplicationShortcut; onActivated: win.findAgain(true) }
-    Shortcut { sequence: "Ctrl+Shift+F"; context: Qt.ApplicationShortcut; onActivated: { win.searchOpen = true; search.forceActiveFocus(); search.selectAll() } }
+    Shortcut { sequence: "Ctrl+Shift+F"; context: Qt.ApplicationShortcut; onActivated: win.toggleSearch() }
     Shortcut { sequence: "Ctrl+Shift+E"; context: Qt.ApplicationShortcut; onActivated: backend.saveSearch() }
     Shortcut { sequence: "Ctrl+Shift+B"; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
     // Markdown, with the keys Omawrite uses.
@@ -229,6 +267,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+X"; context: Qt.ApplicationShortcut; enabled: editor.activeFocus; onActivated: backend.toggleWrap(editor.selectionStart, editor.selectionEnd, "~~") }
     Shortcut { sequence: "Ctrl+K"; context: Qt.ApplicationShortcut; enabled: editor.activeFocus; onActivated: backend.insertLink(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequences: ["Ctrl+D", "Ctrl+Return", "Ctrl+Enter"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
+    Shortcut { sequence: "Ctrl+Shift+D"; context: Qt.ApplicationShortcut; onActivated: backend.duplicateLines(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+K"; context: Qt.ApplicationShortcut; onActivated: backend.deleteLines(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; onActivated: { if (!backend.shiftHeld()) win.openProjectNumber(1) } }
@@ -456,7 +495,7 @@ ApplicationWindow {
                         // Specific key handlers run before Keys.onPressed, so the open suggestion list is answered here too.
                         Keys.onEscapePressed: {
                             if (tagChoices.length > 0) { tagsDismissed = true; refreshTags(); return }
-                            backend.query = ""; win.searchOpen = false; editor.forceActiveFocus()
+                            win.closeSearch()
                         }
                         Keys.onReturnPressed: {
                             if (tagChoices.length > 0 && tagPicked >= 0) completeTag(tagChoices[tagPicked])
@@ -550,6 +589,7 @@ ApplicationWindow {
                         // The one non-stock touch: a blue caret, a hair thicker than the default.
                         cursorDelegate: Rectangle {
                             id: caret
+                            visible: editor.activeFocus // hidden while the search bar has the focus
                             width: win.caretWidth
                             color: win.caretColor
                             antialiasing: true
@@ -579,7 +619,13 @@ ApplicationWindow {
                         property int previousPos: 0
                         property int currentPos: 0
                         onCursorPositionChanged: { previousPos = currentPos; currentPos = cursorPosition; backend.rememberCursor(cursorPosition) }
-                        Component.onCompleted: backend.attach(textDocument)
+                        Component.onCompleted: { backend.attach(textDocument); if (startWithPicker) backend.openDialog() }
+
+                        // Ctrl+scroll sizes the text, as Ctrl+= and Ctrl+- do.
+                        WheelHandler {
+                            acceptedModifiers: Qt.ControlModifier
+                            onWheel: event => backend.changeFontSize(event.angleDelta.y > 0 ? 1 : -1)
+                        }
 
                         // Several carets: Ctrl+click adds one (the old caret stays behind), and keys then act on all of them.
                         property int ctrlBase: 0
@@ -995,7 +1041,7 @@ ApplicationWindow {
                         Text {
                             visible: !moveField.text
                             anchors.verticalCenter: parent.verticalCenter
-                            text: qsTr("Move to project…")
+                            text: win.moveJump ? qsTr("Go to project…") : qsTr("Move to project…")
                             font: moveField.font
                             color: theme.muted
                         }
@@ -1038,7 +1084,7 @@ ApplicationWindow {
                     Text {
                         visible: win.moveShown.length === 0
                         Layout.leftMargin: 8
-                        text: win.moveItems.length === 0 ? qsTr("No projects to move into") : qsTr("No match")
+                        text: win.moveItems.length === 0 ? (win.moveJump ? qsTr("No projects yet") : qsTr("No projects to move into")) : qsTr("No match")
                         font.family: backend.fontFamily
                         font.pointSize: win.fs - 0.75
                         color: theme.muted
@@ -1094,6 +1140,7 @@ ApplicationWindow {
             readonly property var all: [
                 [qsTr("Toggle done"), "Ctrl+D", () => backend.toggleDone(editor.selectionStart, editor.selectionEnd)],
                 [qsTr("Archive done items / selection"), "Ctrl+Shift+A", () => backend.archive(editor.selectionStart, editor.selectionEnd)],
+                [qsTr("Duplicate line"), "Ctrl+Shift+D", () => backend.duplicateLines(editor.selectionStart, editor.selectionEnd)],
                 [qsTr("Delete line"), "Ctrl+Shift+K", () => backend.deleteLines(editor.selectionStart, editor.selectionEnd)],
                 [qsTr("Collapse item"), "Ctrl+,", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false)],
                 [qsTr("Expand item"), "Ctrl+.", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, false, false)],
@@ -1114,7 +1161,7 @@ ApplicationWindow {
                 [qsTr("Find and replace"), "Ctrl+F", () => win.openFind()],
                 [qsTr("Find next"), "Ctrl+G", () => win.findAgain(false)],
                 [qsTr("Find previous"), "Ctrl+Shift+G", () => win.findAgain(true)],
-                [qsTr("Filter (search bar)"), "Ctrl+Shift+F", () => { win.searchOpen = true; search.forceActiveFocus(); search.selectAll() }],
+                [qsTr("Filter (search bar)"), "Ctrl+Shift+F", () => win.toggleSearch()],
                 [qsTr("Save search"), "Ctrl+Shift+E", () => backend.saveSearch()],
                 [qsTr("Add a tag to the search"), "Ctrl+click", null],
                 [qsTr("Filter a tag out"), "Ctrl+Shift+click", null],
@@ -1128,12 +1175,14 @@ ApplicationWindow {
                 [qsTr("Smaller text"), "Ctrl+-", () => backend.changeFontSize(-1)],
                 [qsTr("Reset text size"), "Ctrl+0", () => backend.changeFontSize(0)],
                 [qsTr("Open"), "Ctrl+O", () => backend.openDialog()],
+                [qsTr("New window"), "Ctrl+N", () => backend.newWindow()],
+                [qsTr("Go to project"), "Ctrl+L", () => win.openJump()],
                 [qsTr("Save"), "Ctrl+S", () => backend.saveNow()],
                 [qsTr("Save As"), "Ctrl+Shift+S", () => backend.saveAsDialog()],
                 [qsTr("Print"), "Ctrl+P", () => backend.print()],
                 [qsTr("Undo"), "Ctrl+Z", () => editor.undo()],
                 [qsTr("Redo"), "Ctrl+Shift+Z", () => editor.redo()],
-                [qsTr("This list"), "Ctrl+/", null],
+                [qsTr("This list"), "Ctrl+/ or F1", null],
                 [qsTr("Quit"), "Ctrl+Q", () => Qt.quit()]
             ]
             readonly property var shown: {
