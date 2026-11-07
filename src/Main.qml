@@ -871,6 +871,7 @@ ApplicationWindow {
             readonly property bool active: backend.notice !== "" && backend.error === ""
             z: 5
             anchors.left: parent.left
+            anchors.leftMargin: win.sidebarVisible ? backend.sidebarWidth : 0 // only under the editor
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: Math.round(win.fs * 1.7)
