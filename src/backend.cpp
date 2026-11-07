@@ -625,6 +625,7 @@ void Backend::refresh() {
                 inSearches[j] = true;
 
     QVector<bool> visible(n, true);
+    QVector<bool> matched(n, false); // items that satisfy the search themselves, as opposed to showing because of one
     const Query query = Query::parse(m_query);
     if (m_highlighter)
         m_highlighter->setSearchTerms(query.textTerms());
@@ -633,6 +634,7 @@ void Backend::refresh() {
         for (int i = 0; i < n; ++i) {
             if (items[i].type == Item::Blank || inSearches[i] || !query.matches(items[i]))
                 continue;
+            matched[i] = true;
             for (int p = i; p >= 0; p = parent[p])
                 visible[p] = true;
             for (int j = i; j < end[i]; ++j)
@@ -681,13 +683,26 @@ void Backend::refresh() {
                 return true;
         return false;
     };
+    // While searching, a fold that hides a match is held open. The fold itself is kept, so the outline
+    // goes back to how it was as soon as the search no longer needs it.
+    QSet<int> heldOpen;
     for (int f = m_folds.size() - 1; f >= 0; --f) {
         const int b = m_folds[f].blockNumber();
         if (b >= n || !parent_has_children(b)) {
             m_folds.removeAt(f);
             continue;
         }
-        for (int j = b + 1; j < foldRegionEnd(b); ++j)
+        const int regionEnd = foldRegionEnd(b);
+        if (!query.isEmpty()) {
+            bool hidesMatch = false;
+            for (int j = b + 1; j < regionEnd && !hidesMatch; ++j)
+                hidesMatch = matched[j] && visible[j];
+            if (hidesMatch) {
+                heldOpen.insert(b);
+                continue;
+            }
+        }
+        for (int j = b + 1; j < regionEnd; ++j)
             visible[j] = false;
     }
 
@@ -714,7 +729,7 @@ void Backend::refresh() {
     for (int i = 0; i < n; ++i)
         if (visible[i] && parent_has_children(i))
             marks << QVariantMap{{"block", i}, {"pos", m_doc->findBlockByNumber(i).position()},
-                                 {"folded", foldIndex(i) >= 0}};
+                                 {"folded", foldIndex(i) >= 0 && !heldOpen.contains(i)}};
     if (marks != m_foldMarks) {
         m_foldMarks = marks;
         emit foldsChanged();
