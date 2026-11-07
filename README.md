@@ -1,7 +1,29 @@
 # Omapaper
 
-A plain-text task outliner for Omarchy. Open it and type: the document is an ordinary
+A plain-text task outliner for Omarchy, in the style of [TaskPaper](https://www.taskpaper.com). Open it and type: the document is an ordinary
 `.taskpaper` (or `.txt`) file, and the styling follows what you write.
+
+![Omapaper](docs/screenshot.png)
+
+## Install
+
+On Omarchy or any Arch-based system:
+
+```
+yay -S omapaper
+```
+
+Or build it yourself (needs `qt6-base`, `qt6-declarative`, `qt6-wayland` and `xdg-desktop-portal`):
+
+```
+git clone https://github.com/helloindustry/omapaper
+cd omapaper
+bin/install
+```
+
+`bin/build` only compiles it (the binary lands in `build/omapaper`), `bin/test` runs the tests.
+
+Early software: it writes to your files as you type, so keep a backup (or a synced folder) of anything that matters.
 
 ```
 Inbox:
