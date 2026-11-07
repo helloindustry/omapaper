@@ -10,7 +10,7 @@ ApplicationWindow {
     minimumWidth: 480
     minimumHeight: 320
     visible: true
-    title: backend.title + " — TaskPaper"
+    title: backend.title + " — Omapaper"
     property bool caretThemed: backend.caretThemed() // the theme's accent by default; an undocumented shortcut switches to the blue, and it is remembered
     readonly property color caretColor: caretThemed ? theme.accent : "#00b3ff" // iA Writer caret blue, sampled from the app
     readonly property real caretWidth: 2.2

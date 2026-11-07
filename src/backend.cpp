@@ -60,9 +60,9 @@ Backend::Backend(Theme *theme, const QString &initialFile, QObject *parent)
     connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, [this] { m_external.start(); });
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this] { m_external.start(); });
     connect(m_theme, &Theme::changed, this, &Backend::applyColors);
-    m_sidebarWidth = QSettings("taskpaper", "taskpaper").value("sidebarWidth", 240.0).toDouble();
+    m_sidebarWidth = QSettings("omapaper", "omapaper").value("sidebarWidth", 240.0).toDouble();
     m_defaultFontSize = omarchyFontSize();
-    m_fontDelta = QSettings("taskpaper", "taskpaper").value("fontDelta", 0.0).toDouble();
+    m_fontDelta = QSettings("omapaper", "omapaper").value("fontDelta", 0.0).toDouble();
     m_fontSize = m_defaultFontSize + m_fontDelta;
 }
 
@@ -89,7 +89,7 @@ void Backend::changeFontSize(double delta) {
         return;
     m_fontDelta = next;
     m_fontSize = m_defaultFontSize + m_fontDelta;
-    QSettings("taskpaper", "taskpaper").setValue("fontDelta", m_fontDelta);
+    QSettings("omapaper", "omapaper").setValue("fontDelta", m_fontDelta);
     emit fontSizeChanged();
 }
 QString Backend::title() const { return m_path.isEmpty() ? tr("Untitled") : QFileInfo(m_path).fileName(); }
@@ -134,7 +134,7 @@ void Backend::attach(QQuickTextDocument *document) {
     }
 
     // No file given: open the last one, or start the default list, so typing can begin at once.
-    QSettings settings("taskpaper", "taskpaper");
+    QSettings settings("omapaper", "omapaper");
     QString path = m_initialFile;
     if (path.isEmpty() && QFileInfo::exists(settings.value("lastFile").toString()))
         path = settings.value("lastFile").toString();
@@ -167,23 +167,23 @@ void Backend::load(const QString &requested) {
     m_path = path;
     m_disk = text;
     watchFile();
-    const int remembered = QSettings("taskpaper", "taskpaper")
+    const int remembered = QSettings("omapaper", "omapaper")
                                .value("cursor/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding)), 0).toInt();
     m_cursor = qBound(0, remembered, qMax(0, m_doc->characterCount() - 1));
     m_zoomed = false;
     m_folds.clear();
     m_refold.clear();
     const QString foldKey = "folds/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding));
-    for (const QString &number : QSettings("taskpaper", "taskpaper").value(foldKey).toString().split(',', Qt::SkipEmptyParts)) {
+    for (const QString &number : QSettings("omapaper", "omapaper").value(foldKey).toString().split(',', Qt::SkipEmptyParts)) {
         const int block = number.toInt();
         if (block < m_doc->blockCount() && foldIndex(block) < 0 && hasChildren(block))
             m_folds.append(QTextCursor(m_doc->findBlockByNumber(block)));
     }
     m_collapsedTags.clear();
-    for (const QString &name : QSettings("taskpaper", "taskpaper").value("collapsedTags/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding))).toString().split(',', Qt::SkipEmptyParts))
+    for (const QString &name : QSettings("omapaper", "omapaper").value("collapsedTags/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding))).toString().split(',', Qt::SkipEmptyParts))
         m_collapsedTags.insert(name);
     m_pin = QTextCursor();
-    QSettings("taskpaper", "taskpaper").setValue("lastFile", path);
+    QSettings("omapaper", "omapaper").setValue("lastFile", path);
     m_notUtf8 = notUtf8;
     m_readOnly = notUtf8 || (file.exists() && !QFileInfo(path).isWritable());
     setError(m_readOnly ? readOnlyMessage() : QString());
@@ -256,7 +256,7 @@ bool Backend::renderPdf(const QString &path) const {
 }
 
 void Backend::print() {
-    QTemporaryFile file(QDir::tempPath() + "/taskpaper-XXXXXX.pdf");
+    QTemporaryFile file(QDir::tempPath() + "/omapaper-XXXXXX.pdf");
     file.setAutoRemove(false);
     if (!file.open() || (file.close(), !renderPdf(file.fileName()))) {
         setError(tr("Can't prepare the page for printing"));
@@ -287,13 +287,13 @@ QVariantList Backend::lineRange(int position) const {
     return {b.position(), b.position() + b.length() - 1}; // the line's text, up to but not into the next line
 }
 
-bool Backend::caretThemed() const { return QSettings("taskpaper", "taskpaper").value("caretThemed", true).toBool(); }
-void Backend::setCaretThemed(bool themed) { QSettings("taskpaper", "taskpaper").setValue("caretThemed", themed); }
+bool Backend::caretThemed() const { return QSettings("omapaper", "omapaper").value("caretThemed", true).toBool(); }
+void Backend::setCaretThemed(bool themed) { QSettings("omapaper", "omapaper").setValue("caretThemed", themed); }
 
-void Backend::saveSidebarWidth() { QSettings("taskpaper", "taskpaper").setValue("sidebarWidth", m_sidebarWidth); }
+void Backend::saveSidebarWidth() { QSettings("omapaper", "omapaper").setValue("sidebarWidth", m_sidebarWidth); }
 
-bool Backend::sidebarShown() const { return QSettings("taskpaper", "taskpaper").value("sidebarShown", true).toBool(); }
-void Backend::setSidebarShown(bool shown) { QSettings("taskpaper", "taskpaper").setValue("sidebarShown", shown); }
+bool Backend::sidebarShown() const { return QSettings("omapaper", "omapaper").value("sidebarShown", true).toBool(); }
+void Backend::setSidebarShown(bool shown) { QSettings("omapaper", "omapaper").setValue("sidebarShown", shown); }
 
 void Backend::toggleTagFold(const QString &name) {
     if (!m_collapsedTags.remove(name))
@@ -385,7 +385,7 @@ void Backend::rememberCursor(int position) { m_cursor = position; }
 void Backend::persistCursor() {
     if (m_path.isEmpty() || !m_doc)
         return;
-    QSettings settings("taskpaper", "taskpaper");
+    QSettings settings("omapaper", "omapaper");
     const QString key = QString::fromLatin1(m_path.toUtf8().toBase64(QByteArray::Base64UrlEncoding));
     settings.setValue("cursor/" + key, m_cursor);
     // Which items are folded, as line numbers, so the outline reopens the way it was left.
@@ -442,7 +442,7 @@ void Backend::keepRescueCopy() {
     QSaveFile out(rescue);
     if (out.open(QIODevice::WriteOnly) && out.write(m_doc->toPlainText().toUtf8()) >= 0 && out.commit()) {
         const QString what = m_path.isEmpty() ? tr("Untitled text") : tr("Couldn't save %1").arg(info.fileName());
-        QProcess::startDetached("notify-send", {"-a", "ompaper", what, tr("Your text was kept in %1").arg(rescue)});
+        QProcess::startDetached("notify-send", {"-a", "omapaper", what, tr("Your text was kept in %1").arg(rescue)});
     }
 }
 
@@ -472,7 +472,7 @@ void Backend::newWindow() {
 // The open dialog is the desktop's own, reached through xdg-desktop-portal.
 void Backend::openDialog() {
     auto bus = QDBusConnection::sessionBus();
-    const QString token = "taskpaper" + QString::number(QRandomGenerator::global()->generate());
+    const QString token = "omapaper" + QString::number(QRandomGenerator::global()->generate());
     const QString path = "/org/freedesktop/portal/desktop/request/" + bus.baseService().mid(1).replace('.', '_') + "/" + token;
     bus.connect({}, path, "org.freedesktop.portal.Request", "Response", this, SLOT(portalResponse(uint, QVariantMap)));
     auto call = QDBusMessage::createMethodCall("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
@@ -585,7 +585,7 @@ void Backend::externalChange() {
 
 void Backend::saveAsDialog() {
     auto bus = QDBusConnection::sessionBus();
-    const QString token = "taskpaper" + QString::number(QRandomGenerator::global()->generate());
+    const QString token = "omapaper" + QString::number(QRandomGenerator::global()->generate());
     const QString path = "/org/freedesktop/portal/desktop/request/" + bus.baseService().mid(1).replace('.', '_') + "/" + token;
     bus.connect({}, path, "org.freedesktop.portal.Request", "Response", this, SLOT(saveAsResponse(uint, QVariantMap)));
     auto call = QDBusMessage::createMethodCall("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
@@ -604,7 +604,7 @@ void Backend::saveAsResponse(uint code, const QVariantMap &results) {
         return;
     save(); // finish the old file first
     m_path = QUrl(list.first()).toLocalFile();
-    QSettings("taskpaper", "taskpaper").setValue("lastFile", m_path);
+    QSettings("omapaper", "omapaper").setValue("lastFile", m_path);
     QFile(m_path).open(QIODevice::WriteOnly | QIODevice::Append); // creates it, so an empty document still gets a file
     m_disk.clear();
     m_readOnly = false;

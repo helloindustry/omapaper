@@ -1,7 +1,9 @@
-pkgname=taskpaper
+pkgname=omapaper
 pkgver=0.1.0
 pkgrel=1
 pkgdesc='A plain-text task outliner in the style of TaskPaper'
+conflicts=('taskpaper')
+replaces=('taskpaper')
 arch=('x86_64' 'aarch64')
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'xdg-desktop-portal')
@@ -16,8 +18,8 @@ build() {
 
 package() {
   cd "$startdir/.."
-  install -Dm755 build/taskpaper "$pkgdir/usr/bin/taskpaper"
+  install -Dm755 build/omapaper "$pkgdir/usr/bin/omapaper"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-  install -Dm644 "$startdir/taskpaper.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/taskpaper.svg"
-  install -Dm644 "$startdir/taskpaper.desktop" "$pkgdir/usr/share/applications/taskpaper.desktop"
+  install -Dm644 "$startdir/omapaper.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/omapaper.svg"
+  install -Dm644 "$startdir/omapaper.desktop" "$pkgdir/usr/share/applications/omapaper.desktop"
 }

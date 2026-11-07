@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=TaskPaper
+Name=Omapaper
 Comment=Plain-text task lists with projects, tags, and search
-Exec=taskpaper %f
-Icon=taskpaper
+Exec=omapaper %f
+Icon=omapaper
 Terminal=false
 Categories=Office;Utility;
 MimeType=text/plain;
-StartupWMClass=taskpaper
+StartupWMClass=omapaper
