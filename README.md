@@ -60,3 +60,7 @@ Every key is Ctrl+key or Ctrl+Shift+key (TaskPaper's where known). Reopening a f
 Omarchy's single-key `?` and `Q` would type into a document, so help and quit take Ctrl.
 
 Text is Omarchy's monospace font (iA Writer Mono S by default) at the size of Omarchy's terminal (read from foot.ini).
+
+## Markdown (only if you type it)
+
+`**bold**`, `*italic*` / `_italic_`, `***both***`, `~~strike~~` and `` `code` `` are styled as you type, with the markers dimmed. The text is never changed. Markers need a non-space inside and a word edge outside, so `2*3*4`, `snake_case`, URLs and tags in ordinary TaskPaper lines look exactly as before.

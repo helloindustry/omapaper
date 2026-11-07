@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QColor>
+#include <QPair>
+#include <QVector>
 #include <QSyntaxHighlighter>
 
 // Styles each line as it is typed: bold projects, dimmed notes, struck-through
@@ -14,6 +16,7 @@ public:
 
 protected:
     void highlightBlock(const QString &text) override;
+    void markdown(const QString &text, int from, const QVector<QPair<int, int>> &skip);
 
 private:
     int m_hoverStart = -1, m_hoverEnd = -1;

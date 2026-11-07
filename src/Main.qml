@@ -369,8 +369,21 @@ ApplicationWindow {
                         selectedTextColor: theme.accentForeground
                         // The one non-stock touch: a blue caret, a hair thicker than the default.
                         cursorDelegate: Rectangle {
+                            id: caret
                             width: win.caretWidth
                             color: win.caretColor
+                            // A custom caret has to blink itself. It stays solid while you type or move, then blinks.
+                            Timer {
+                                id: blink
+                                interval: 530
+                                repeat: true
+                                running: editor.activeFocus
+                                onTriggered: caret.opacity = caret.opacity > 0 ? 0 : 1
+                            }
+                            Connections {
+                                target: editor
+                                function onCursorPositionChanged() { caret.opacity = 1; blink.restart() }
+                            }
                         }
                         leftPadding: 32
                         rightPadding: 24
