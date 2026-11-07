@@ -129,7 +129,7 @@ private:
     void load(const QString &path);
     void watchFile();
     void externalChange();
-    void showNotice(const QString &message);
+    void showNotice(const QString &message, int milliseconds = 3000);
     void persistCursor();
     void refresh();
     void onChange(int position, int removed, int added);

@@ -655,22 +655,6 @@ ApplicationWindow {
                 }
 
                 Rectangle {
-                    visible: backend.notice !== "" && backend.error === ""
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Math.round(win.fs * 2.8)
-                    color: theme.sidebar
-                    Text {
-                        anchors.fill: parent
-                        anchors.leftMargin: 16
-                        verticalAlignment: Text.AlignVCenter
-                        text: backend.notice
-                        font.family: backend.fontFamily
-                        font.pointSize: win.fs - 1.5
-                        color: theme.muted
-                    }
-                }
-
-                Rectangle {
                     visible: backend.error !== ""
                     Layout.fillWidth: true
                     Layout.preferredHeight: Math.round(win.fs * 2.8)
@@ -877,6 +861,36 @@ ApplicationWindow {
                         color: theme.muted
                     }
                 }
+            }
+        }
+
+        // A brief cue along the bottom edge when something happens ("Saved"). It floats, so nothing moves, and it fades by itself.
+        Rectangle {
+            id: toast
+            property string shownText: ""
+            readonly property bool active: backend.notice !== "" && backend.error === ""
+            z: 5
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: Math.round(win.fs * 1.7)
+            color: Qt.alpha(theme.sidebar, 0.92)
+            opacity: active ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: 180 } }
+            Connections {
+                target: backend
+                function onNoticeChanged() { if (backend.notice !== "") toast.shownText = backend.notice }
+            }
+            Text {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+                text: toast.shownText
+                font.family: backend.fontFamily
+                font.pointSize: win.fs - 2
+                color: theme.muted
             }
         }
 

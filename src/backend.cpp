@@ -97,10 +97,10 @@ void Backend::applyColors() {
         m_highlighter->setColors(m_theme->accent(), m_theme->muted());
 }
 
-void Backend::showNotice(const QString &message) {
+void Backend::showNotice(const QString &message, int milliseconds) {
     m_notice = message;
     emit noticeChanged();
-    m_noticeTimer.start();
+    m_noticeTimer.start(milliseconds);
 }
 
 void Backend::setError(const QString &message) {
@@ -383,6 +383,7 @@ void Backend::save() {
     }
     m_dirty = false;
     setError({});
+    showNotice(tr("Saved"), 1500);
 }
 
 // The open dialog is the desktop's own, reached through xdg-desktop-portal.
