@@ -1056,7 +1056,7 @@ ApplicationWindow {
             anchors.leftMargin: win.sidebarVisible ? backend.sidebarWidth : 0 // only under the editor
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            height: Math.round(win.fs * 3.6) // the same bar as the search bar at the top
+            height: Math.round(win.fs * 2.8) // the same bar as the zoom path bar at the top
             color: theme.sidebar
             opacity: active ? 1 : 0
             visible: opacity > 0
@@ -1068,12 +1068,13 @@ ApplicationWindow {
             Text {
                 anchors.fill: parent
                 anchors.leftMargin: 16
+                anchors.rightMargin: 16
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
                 text: win.deleteBlock >= 0 ? qsTr("Delete “%1”?  y / n").arg(win.deleteName) : toast.shownText
                 font.family: backend.fontFamily
-                font.pointSize: win.fs - 0.75
-                color: theme.foreground
+                font.pointSize: win.fs - 1.5
+                color: theme.muted
             }
         }
 
