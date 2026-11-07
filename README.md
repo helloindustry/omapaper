@@ -30,7 +30,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+D (or Ctrl+Enter) | Toggle done (adds `@done(today)`) |
 | Ctrl+Shift+K | Delete the whole line (or every selected line; a folded item takes its hidden lines with it) |
 | Ctrl+Shift+A | Archive the selection, or every `@done` item if nothing is selected |
-| Ctrl+9 | Collapse the item (Ctrl+. toggles it) |
+| Ctrl+9 | Collapse the item (Ctrl+, toggles it) |
 | Ctrl+Shift+, | Collapse everything, or expand everything if it is all collapsed already |
 | Ctrl+Shift+9 / Ctrl+Shift+0 | Collapse / expand everything |
 | Tab / Shift+Tab (or Ctrl+] / Ctrl+[) | Indent / outdent |
