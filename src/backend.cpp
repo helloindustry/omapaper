@@ -728,7 +728,7 @@ void Backend::refresh() {
     QVariantList marks;
     for (int i = 0; i < n; ++i)
         if (visible[i] && parent_has_children(i))
-            marks << QVariantMap{{"block", i}, {"pos", m_doc->findBlockByNumber(i).position()},
+            marks << QVariantMap{{"block", i},
                                  {"folded", foldIndex(i) >= 0 && !heldOpen.contains(i)}};
     if (marks != m_foldMarks) {
         m_foldMarks = marks;
@@ -1363,6 +1363,11 @@ void Backend::setHover(int start, int end) {
 }
 
 // Where a tag or link sits in the document, so the editor can tell a click on it from a click in the blank space after it.
+int Backend::blockPosition(int block) const {
+    const QTextBlock b = m_doc ? m_doc->findBlockByNumber(block) : QTextBlock();
+    return b.isValid() ? b.position() : 0;
+}
+
 QVariantList Backend::tagSpan(int position) const {
     if (!m_doc || position < 0)
         return {};

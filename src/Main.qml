@@ -813,7 +813,8 @@ ApplicationWindow {
                             model: backend.folds
                             delegate: Text {
                                 required property var modelData
-                                readonly property rect line: { editor.contentHeight; editor.width; return editor.positionToRectangle(modelData.pos) }
+                                // The arrows are kept as they are while typing; only where they sit is re-read, so none of them is rebuilt on a keystroke.
+                                readonly property rect line: { editor.contentHeight; editor.width; editor.length; return editor.positionToRectangle(backend.blockPosition(modelData.block)) }
                                 x: 4
                                 y: line.y
                                 width: 24
