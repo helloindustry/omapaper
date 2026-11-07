@@ -19,7 +19,7 @@ Links (`https://…`, `www.…`, `mailto:`) are underlined and open in your brow
 
 If the file changes on disk (say, another computer editing it through a sync service), the open window updates in place within a moment, keeping your caret, folds and zoom. Edits in different places merge; if you both edit the same spot, yours is kept and theirs is saved beside it as `name (conflict …)`.
 
-`taskpaper [file]` opens a specific file. Click a tag in the document or the sidebar to search for it. Ctrl+click adds another tag to the search (`@a and @b`), and Ctrl+Shift+click filters one out (`not @a`); do the same again to take it back out of the search. Search syntax: `@done`, `not @done`,
+`taskpaper [file]` opens a specific file. Click a tag in the document or the sidebar to search for it. Ctrl+click adds another tag to the search (`@a and @b`), and Ctrl+Shift+click filters one out (`not @a`); do the same again to take it back out of the search. Ctrl+Shift+Alt+click on a tag in the document removes it from its line. Search syntax: `@done`, `not @done`,
 `@due < today`, `not @tag` (hides those items and everything under them), `project Inbox`, `task milk`, joined with `and` / `or`.
 Saved searches live in the file under a `Searches:` project as `@search(query)`. The editor hides that project; they show only in the sidebar. To delete one, click it, press Delete, then `y` (or `n` / Esc to cancel).
 

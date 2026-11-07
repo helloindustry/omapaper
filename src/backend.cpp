@@ -1359,6 +1359,28 @@ QVariantList Backend::tagSpan(int position) const {
     return {};
 }
 
+void Backend::removeTag(int position) {
+    if (!m_doc || position < 0)
+        return;
+    const QTextBlock b = m_doc->findBlock(position);
+    const QString line = b.text();
+    const int column = position - b.position();
+    for (const auto &tag : parseLine(line).tags) {
+        if (column < tag.start || column > tag.start + tag.length)
+            continue;
+        int from = tag.start, to = tag.start + tag.length;
+        if (from > 0 && line[from - 1] == ' ')
+            --from; // "text @tag" -> "text"
+        else if (to < line.size() && line[to] == ' ')
+            ++to;
+        QTextCursor c(m_doc);
+        c.setPosition(b.position() + from);
+        c.setPosition(b.position() + to, QTextCursor::KeepAnchor);
+        c.removeSelectedText();
+        return;
+    }
+}
+
 QVariantList Backend::linkSpan(int position) const {
     if (!m_doc || position < 0)
         return {};

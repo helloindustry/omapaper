@@ -463,6 +463,14 @@ ApplicationWindow {
                                 if (tag !== "") backend.exclude(tag)
                             }
                         }
+                        // Ctrl+Shift+Alt+click on a tag removes it.
+                        TapHandler {
+                            acceptedModifiers: Qt.ControlModifier | Qt.ShiftModifier | Qt.AltModifier
+                            onTapped: eventPoint => {
+                                if (editor.tagAtPoint(eventPoint.position.x, eventPoint.position.y) !== "")
+                                    backend.removeTag(editor.positionAt(eventPoint.position.x, eventPoint.position.y))
+                            }
+                        }
                         Keys.onPressed: event => {
                             // The editor claims Ctrl+Shift+Left/Right itself (select by word), so a Shortcut never sees them.
                             const ctrlShift = (event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier) && !(event.modifiers & Qt.AltModifier)
@@ -958,6 +966,7 @@ ApplicationWindow {
                 [qsTr("Save search"), "Ctrl+Shift+E", () => backend.saveSearch()],
                 [qsTr("Add a tag to the search"), "Ctrl+click", null],
                 [qsTr("Filter a tag out"), "Ctrl+Shift+click", null],
+                [qsTr("Remove a tag from its line"), "Ctrl+Shift+Alt+click", null],
                 [qsTr("Toggle sidebar"), "Ctrl+Shift+B", () => { win.sidebarVisible = !win.sidebarVisible }],
                 [qsTr("Bold"), "Ctrl+B", () => backend.toggleWrap(editor.selectionStart, editor.selectionEnd, "**")],
                 [qsTr("Italic"), "Ctrl+I", () => backend.toggleWrap(editor.selectionStart, editor.selectionEnd, "*")],

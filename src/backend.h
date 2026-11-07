@@ -95,6 +95,7 @@ public:
     Q_INVOKABLE QString tagAt(int position) const;  // the search for the tag under a character, or empty
     Q_INVOKABLE QString linkAt(int position) const; // the address under a character, or empty
     Q_INVOKABLE void setHover(int start, int end); // underline a tag or link while the pointer is over it
+    Q_INVOKABLE void removeTag(int position); // deletes the tag under this character, with one space beside it
     Q_INVOKABLE QVariantList tagSpan(int position) const;  // [start, end] of that tag in the document, or empty
     Q_INVOKABLE QVariantList linkSpan(int position) const; // the same for a link
     Q_INVOKABLE int findNext(const QString &text, int from, bool backwards); // start of the next match among visible lines, or -1
