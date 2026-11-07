@@ -11,8 +11,9 @@ ApplicationWindow {
     minimumHeight: 320
     visible: true
     title: backend.title + " — TaskPaper"
-    readonly property color caretColor: "#00b3ff" // iA Writer caret blue, sampled from the app
-    readonly property real caretWidth: 2.5
+    property bool caretThemed: false // toggled by an undocumented shortcut
+    readonly property color caretColor: caretThemed ? theme.accent : "#00b3ff" // iA Writer caret blue, sampled from the app
+    readonly property real caretWidth: 2.2
     color: theme.background
 
     Material.theme: theme.dark ? Material.Dark : Material.Light
@@ -154,6 +155,7 @@ ApplicationWindow {
     // and the single-letter keys of Omarchy's own apps (Q, ?) would type into the document, so they are Ctrl+Q and Ctrl+/.
     // Every key is Ctrl+key or Ctrl+Shift+key: TaskPaper's where known, otherwise the nearest free one.
     // Omarchy's own bindings all use Super, so none of these collide with it.
+    Shortcut { sequence: "Ctrl+Alt+Shift+C"; context: Qt.ApplicationShortcut; onActivated: win.caretThemed = !win.caretThemed }
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
     Shortcut { sequence: "Ctrl+Shift+M"; context: Qt.ApplicationShortcut; onActivated: win.openMove() }
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
@@ -359,6 +361,7 @@ ApplicationWindow {
                     TextArea {
                         id: editor
                         objectName: "editor"
+                        ContextMenu.menu: null // no popup on right-click
                         focus: true
                         background: null
                         wrapMode: TextEdit.Wrap
@@ -372,6 +375,7 @@ ApplicationWindow {
                             id: caret
                             width: win.caretWidth
                             color: win.caretColor
+                            antialiasing: true
                             // A custom caret has to blink itself. It stays solid while you type or move, then blinks.
                             Timer {
                                 id: blink
