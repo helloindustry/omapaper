@@ -212,7 +212,8 @@ ApplicationWindow {
                 ListView {
                     id: list
                     anchors.fill: parent
-                    anchors.topMargin: 8
+                    anchors.topMargin: 12
+                    anchors.bottomMargin: 6
                     clip: true
                     model: backend.sidebar
                     boundsBehavior: Flickable.StopAtBounds
@@ -397,8 +398,8 @@ ApplicationWindow {
                         }
                         leftPadding: 32
                         rightPadding: 24
-                        topPadding: 16
-                        bottomPadding: 16
+                        topPadding: 22
+                        bottomPadding: 22
                         // A property read, so the width follows the font size when it changes (a method call would not be re-evaluated).
                         tabStopDistance: fontMetrics.averageCharacterWidth * 2
                         persistentSelection: true
