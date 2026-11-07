@@ -201,13 +201,18 @@ ApplicationWindow {
         backend.sidebarWidth = Math.max(120, Math.min(Math.ceil(widest), win.width * 0.6))
     }
 
-    function openFind() {
+    function openFind(replace) {
+        useSelectionForFind()
+        win.findVisible = true
+        const field = replace === true ? replaceField : findField // Ctrl+H starts in the replace box, as Omawrite's does
+        field.input.forceActiveFocus()
+        field.input.selectAll()
+    }
+    // Ctrl+E: whatever is selected on one line becomes the thing to find.
+    function useSelectionForFind() {
         const selected = editor.selectedText
         if (selected !== "" && selected.indexOf("\n") < 0 && selected.indexOf("\u2029") < 0)
             findField.text = selected
-        win.findVisible = true
-        findField.input.forceActiveFocus()
-        findField.input.selectAll()
     }
     function closeFind() {
         win.findVisible = false
@@ -244,6 +249,9 @@ ApplicationWindow {
     // Omarchy's own bindings all use Super, so none of these collide with it.
     Shortcut { sequence: "Ctrl+Alt+Shift+C"; context: Qt.ApplicationShortcut; onActivated: { win.caretThemed = !win.caretThemed; backend.setCaretThemed(win.caretThemed) } }
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
+    Shortcut { sequence: "Ctrl+Y"; context: Qt.ApplicationShortcut; onActivated: editor.redo() } // Omawrite's redo, beside Ctrl+Shift+Z
+    Shortcut { sequence: "Ctrl+W"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() } // one window per process, so closing it ends this copy
+    Shortcut { sequence: "Ctrl+E"; context: Qt.ApplicationShortcut; onActivated: win.useSelectionForFind() }
     Shortcut { sequence: "Ctrl+Shift+M"; context: Qt.ApplicationShortcut; onActivated: win.openMove() }
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
@@ -291,7 +299,8 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+Left"; context: Qt.ApplicationShortcut; onActivated: backend.zoomOut() }
     Shortcut { sequence: "Ctrl+Up"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.stepSidebar(-1) }
     Shortcut { sequence: "Ctrl+Down"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.stepSidebar(1) }
-    Shortcut { sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
+    Shortcut { sequence: "Ctrl+H"; context: Qt.ApplicationShortcut; onActivated: win.openFind(true) }
+    Shortcut { sequence: "Ctrl+Shift+H"; context: Qt.ApplicationShortcut; onActivated: backend.showAll() }
 
     Item {
         id: content
@@ -571,11 +580,17 @@ ApplicationWindow {
                 }
 
                 ScrollView {
+                    id: editorScroll
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    // Text wraps; it never scrolls sideways. Without this the placeholder's own width sets the content width.
+                    contentWidth: availableWidth
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                     TextArea {
                         id: editor
+                        width: editorScroll.availableWidth
+                        implicitWidth: editorScroll.availableWidth // not the placeholder's width
                         objectName: "editor"
                         ContextMenu.menu: null // no popup on right-click
                         focus: true
@@ -619,7 +634,7 @@ ApplicationWindow {
                         property int previousPos: 0
                         property int currentPos: 0
                         onCursorPositionChanged: { previousPos = currentPos; currentPos = cursorPosition; backend.rememberCursor(cursorPosition) }
-                        Component.onCompleted: { backend.attach(textDocument); if (startWithPicker) backend.openDialog() }
+                        Component.onCompleted: backend.attach(textDocument)
 
                         // Ctrl+scroll sizes the text, as Ctrl+= and Ctrl+- do.
                         WheelHandler {
@@ -1157,8 +1172,10 @@ ApplicationWindow {
                 [qsTr("Open project 1 to 9 (top to bottom)"), "Ctrl+1 … Ctrl+9", null],
                 [qsTr("Previous in the sidebar"), "Ctrl+Up", () => win.stepSidebar(-1)],
                 [qsTr("Next in the sidebar"), "Ctrl+Down", () => win.stepSidebar(1)],
-                [qsTr("Home (whole document)"), "Ctrl+H", () => backend.showAll()],
-                [qsTr("Find and replace"), "Ctrl+F", () => win.openFind()],
+                [qsTr("Home (whole document)"), "Ctrl+Shift+H", () => backend.showAll()],
+                [qsTr("Find"), "Ctrl+F", () => win.openFind()],
+                [qsTr("Find and replace"), "Ctrl+H", () => win.openFind(true)],
+                [qsTr("Use selection for find"), "Ctrl+E", () => win.useSelectionForFind()],
                 [qsTr("Find next"), "Ctrl+G", () => win.findAgain(false)],
                 [qsTr("Find previous"), "Ctrl+Shift+G", () => win.findAgain(true)],
                 [qsTr("Filter (search bar)"), "Ctrl+Shift+F", () => win.toggleSearch()],
@@ -1181,8 +1198,9 @@ ApplicationWindow {
                 [qsTr("Save As"), "Ctrl+Shift+S", () => backend.saveAsDialog()],
                 [qsTr("Print"), "Ctrl+P", () => backend.print()],
                 [qsTr("Undo"), "Ctrl+Z", () => editor.undo()],
-                [qsTr("Redo"), "Ctrl+Shift+Z", () => editor.redo()],
+                [qsTr("Redo"), "Ctrl+Shift+Z or Ctrl+Y", () => editor.redo()],
                 [qsTr("This list"), "Ctrl+/ or F1", null],
+                [qsTr("Close window"), "Ctrl+W", () => Qt.quit()],
                 [qsTr("Quit"), "Ctrl+Q", () => Qt.quit()]
             ]
             readonly property var shown: {

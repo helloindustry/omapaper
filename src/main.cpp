@@ -44,9 +44,10 @@ int main(int argc, char *argv[]) {
     app.installTranslator(&translator);
 
     Theme theme;
-    // Ctrl+N starts another window with "--pick": it asks which file to open instead of repeating this one.
-    const bool pick = app.arguments().value(1) == "--pick";
-    Backend backend(&theme, pick ? QString() : app.arguments().value(1));
+    // Ctrl+N starts another window with "--new": a blank, untitled document.
+    const bool blank = app.arguments().value(1) == "--new";
+    Backend backend(&theme, blank ? QString() : app.arguments().value(1));
+    backend.setStartBlank(blank);
     QObject::connect(&app, &QGuiApplication::aboutToQuit, &backend, &Backend::saveOnQuit);
 
     QQmlApplicationEngine engine;
@@ -54,7 +55,6 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("translator", &translator);
     engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);
-    engine.rootContext()->setContextProperty("startWithPicker", pick);
     engine.load(QUrl("qrc:/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;

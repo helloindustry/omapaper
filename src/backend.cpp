@@ -116,6 +116,23 @@ void Backend::attach(QQuickTextDocument *document) {
     applyColors();
     connect(m_doc, &QTextDocument::contentsChange, this, &Backend::onChange);
 
+    // Ctrl+N: a blank, untitled document. Nothing is written until the first save asks where.
+    if (m_startBlank) {
+        m_applying = true;
+        m_doc->setPlainText({});
+        m_doc->clearUndoRedoStacks();
+        m_applying = false;
+        m_dirty = false;
+        m_path.clear();
+        m_disk.clear();
+        m_cursor = 0;
+        watchFile();
+        emit fileChanged();
+        emit zoomChanged();
+        refresh();
+        return;
+    }
+
     // No file given: open the last one, or start the default list, so typing can begin at once.
     QSettings settings("taskpaper", "taskpaper");
     QString path = m_initialFile;
@@ -185,6 +202,8 @@ void Backend::load(const QString &requested) {
 }
 
 void Backend::openPath(const QString &path) {
+    if (m_path.isEmpty() && m_doc && !m_doc->toPlainText().trimmed().isEmpty())
+        keepRescueCopy(); // untitled text has no file to fall back on
     save(); // also remembers the caret of the file being left
     load(path);
 }
@@ -409,30 +428,45 @@ QString Backend::readOnlyMessage() const {
                    : tr("%1 is read-only, so changes aren't saved. Ctrl+Shift+S saves a copy.").arg(QFileInfo(m_path).fileName());
 }
 
-// On the way out, anything that still couldn't reach its file is kept beside the app's data, and a desktop
-// notification says where, so quitting never throws work away.
-void Backend::saveOnQuit() {
-    save();
-    if (!m_doc || !m_dirty || m_path.isEmpty())
+// Text that has nowhere to go (a file that can't be written, or an untitled document) is kept beside the app's
+// data, and a desktop notification says where, so quitting or opening something else never throws work away.
+void Backend::keepRescueCopy() {
+    if (!m_doc)
         return;
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/unsaved";
     QDir().mkpath(dir);
     const QFileInfo info(m_path);
-    const QString rescue = dir + "/" + info.completeBaseName() + "-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + "."
+    const QString base = m_path.isEmpty() ? tr("Untitled") : info.completeBaseName();
+    const QString rescue = dir + "/" + base + "-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + "."
                            + (info.suffix().isEmpty() ? "taskpaper" : info.suffix());
     QSaveFile out(rescue);
-    if (out.open(QIODevice::WriteOnly) && out.write(m_doc->toPlainText().toUtf8()) >= 0 && out.commit())
-        QProcess::startDetached("notify-send", {"-a", "ompaper", tr("Couldn't save %1").arg(info.fileName()), tr("Your text was kept in %1").arg(rescue)});
+    if (out.open(QIODevice::WriteOnly) && out.write(m_doc->toPlainText().toUtf8()) >= 0 && out.commit()) {
+        const QString what = m_path.isEmpty() ? tr("Untitled text") : tr("Couldn't save %1").arg(info.fileName());
+        QProcess::startDetached("notify-send", {"-a", "ompaper", what, tr("Your text was kept in %1").arg(rescue)});
+    }
+}
+
+void Backend::saveOnQuit() {
+    save();
+    if (!m_doc)
+        return;
+    const bool untitledText = m_path.isEmpty() && !m_doc->toPlainText().trimmed().isEmpty();
+    if (untitledText || (!m_path.isEmpty() && m_dirty))
+        keepRescueCopy();
 }
 
 void Backend::saveNow() {
+    if (m_path.isEmpty()) { // untitled: the first save asks where
+        saveAsDialog();
+        return;
+    }
     save();
     if (!m_path.isEmpty() && m_error.isEmpty())
         showNotice(tr("Saved"), 1500);
 }
 
 void Backend::newWindow() {
-    QProcess::startDetached(QCoreApplication::applicationFilePath(), {"--pick"});
+    QProcess::startDetached(QCoreApplication::applicationFilePath(), {"--new"});
 }
 
 // The open dialog is the desktop's own, reached through xdg-desktop-portal.

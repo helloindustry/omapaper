@@ -28,6 +28,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Key | Action |
 | --- | --- |
 | Ctrl+D (or Ctrl+Enter) | Toggle done (adds `@done(today)`) |
+| Ctrl+Shift+D | Duplicate the item (or every selected line) with its children, just below |
 | Ctrl+Shift+K | Delete the whole line (or every selected line; a folded item takes its hidden lines with it) |
 | Ctrl+Shift+A | Archive the selection, or every `@done` item if nothing is selected |
 | Ctrl+, | Collapse the item |
@@ -41,19 +42,23 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+Shift+Up / Down | Move item with its children |
 | Ctrl+Shift+M | Pick a project to move the selection (and everything beneath it) into |
 | Ctrl+Shift+Right / Ctrl+Shift+Left | Focus in / out (zoom), as TaskPaper's Option-Command-Right / Left |
-| Ctrl+H | Home: the whole document |
-| Ctrl+F | Find and replace (top right; Enter = next, Shift+Enter = previous, Esc closes) |
+| Ctrl+Shift+H | Home: the whole document |
+| Ctrl+F | Find (top right; Enter = next, Shift+Enter = previous, Esc closes) |
+| Ctrl+H | Find and replace (the same panel, starting in the replace box) |
+| Ctrl+E | Use the selection for find |
 | Ctrl+G / Ctrl+Shift+G | Find next / previous |
 | Ctrl+Shift+F | Filter with the search bar |
 | Ctrl+Shift+E | Save the current search |
 | Ctrl+Shift+B | Toggle sidebar |
 | Ctrl+B / Ctrl+I / Ctrl+Shift+X | Markdown bold / italic / strikethrough on the selection, or on the word at the caret when nothing is selected (Omawrite's keys) |
 | Ctrl+K | Markdown link: the selection becomes the label, and a URL on the clipboard the target |
-| Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text to Omarchy's size |
+| Ctrl+= / Ctrl+- / Ctrl+0 (or Ctrl+scroll) | Bigger / smaller / reset text to Omarchy's size |
+| Ctrl+N | New window with a blank, untitled document (the first Ctrl+S asks where to save it) |
 | Ctrl+O / Ctrl+S / Ctrl+Shift+S | Open / Save now / Save As |
+| Ctrl+L | Go to project: type to filter, Enter zooms into it |
 | Ctrl+P | Print what is on screen to the default printer |
-| Ctrl+/ | Show all keys. Type to filter them, Down and Enter to run one, Esc to close |
-| Ctrl+Q | Quit |
+| Ctrl+/ (or F1) | Show all keys. Type to filter them, Down and Enter to run one, Esc to close |
+| Ctrl+W / Ctrl+Q | Close the window / quit |
 
 Typing `@` and a letter offers a tag that is already in the document (`@M` suggests `@MIT`): Tab, Right, or Enter accepts it, and typing on replaces it.
 

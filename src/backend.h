@@ -49,11 +49,13 @@ public:
 
     Q_INVOKABLE void attach(QQuickTextDocument *document);
     Q_INVOKABLE void openDialog();
-    Q_INVOKABLE void newWindow(); // another copy of the app, which asks which file to open
+    Q_INVOKABLE void newWindow(); // another copy of the app with a blank, untitled document
     Q_INVOKABLE void saveAsDialog();
     Q_INVOKABLE void changeFontSize(double delta); // 0 resets to the default
     Q_INVOKABLE void openPath(const QString &path);
     Q_INVOKABLE void save();
+    void setStartBlank(bool blank) { m_startBlank = blank; } // an untitled document instead of the last file
+    void keepRescueCopy();
     void saveOnQuit(); // save, and keep a rescue copy if the file can't be written
     QString readOnlyMessage() const;
     QVariantList projectList(int skipFrom, int skipTo) const;
@@ -157,6 +159,7 @@ private:
 
     Theme *m_theme;
     QString m_initialFile, m_path, m_query, m_error, m_notice;
+    bool m_startBlank = false;
     bool m_notUtf8 = false;
     bool m_readOnly = false;    // read-only on disk, or not UTF-8: shown, never written
     bool m_missingNoted = false;
