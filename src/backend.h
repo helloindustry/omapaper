@@ -78,6 +78,8 @@ public:
     Q_INVOKABLE void foldAll(bool collapse, int position = -1); // position: the caret, kept where it is unless a fold hides its line
     void keepCaretVisible(int position);
     Q_INVOKABLE bool shiftHeld() const; // Qt matches Ctrl+Shift+key to a plain Ctrl+key shortcut, so those ask
+    Q_INVOKABLE void toggleWrap(int start, int end, const QString &marker); // **bold**, *italic*, ~~strike~~ on the selection or the word span at the caret
+    Q_INVOKABLE void insertLink(int start, int end);                      // [label](url), taking the URL from the clipboard
     Q_INVOKABLE void foldItems(int start, int end, bool collapse, bool completely); // TaskPaper's Expand/Collapse Items
     Q_INVOKABLE void toggleFoldAll(); // unfolds if everything is folded, otherwise folds everything
     Q_INVOKABLE void zoomToBlock(int block);

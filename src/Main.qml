@@ -170,7 +170,12 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+G"; context: Qt.ApplicationShortcut; onActivated: win.findAgain(true) }
     Shortcut { sequence: "Ctrl+Shift+F"; context: Qt.ApplicationShortcut; onActivated: { win.searchOpen = true; search.forceActiveFocus(); search.selectAll() } }
     Shortcut { sequence: "Ctrl+Shift+E"; context: Qt.ApplicationShortcut; onActivated: backend.saveSearch() }
-    Shortcut { sequence: "Ctrl+B"; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
+    Shortcut { sequence: "Ctrl+Shift+B"; context: Qt.ApplicationShortcut; onActivated: win.sidebarVisible = !win.sidebarVisible }
+    // Markdown, with the keys Omawrite uses.
+    Shortcut { sequence: "Ctrl+B"; context: Qt.ApplicationShortcut; enabled: editor.activeFocus; onActivated: backend.toggleWrap(editor.selectionStart, editor.selectionEnd, "**") }
+    Shortcut { sequence: "Ctrl+I"; context: Qt.ApplicationShortcut; enabled: editor.activeFocus; onActivated: backend.toggleWrap(editor.selectionStart, editor.selectionEnd, "*") }
+    Shortcut { sequence: "Ctrl+Shift+X"; context: Qt.ApplicationShortcut; enabled: editor.activeFocus; onActivated: backend.toggleWrap(editor.selectionStart, editor.selectionEnd, "~~") }
+    Shortcut { sequence: "Ctrl+K"; context: Qt.ApplicationShortcut; enabled: editor.activeFocus; onActivated: backend.insertLink(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequences: ["Ctrl+D", "Ctrl+Return", "Ctrl+Enter"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+K"; context: Qt.ApplicationShortcut; onActivated: backend.deleteLines(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
@@ -905,7 +910,9 @@ ApplicationWindow {
                         [qsTr("Save search"), "Ctrl+Shift+E"],
                         [qsTr("Add a tag to the search"), "Ctrl+click"],
                         [qsTr("Filter a tag out"), "Ctrl+Shift+click"],
-                        [qsTr("Toggle sidebar"), "Ctrl+B"],
+                        [qsTr("Toggle sidebar"), "Ctrl+Shift+B"],
+                        [qsTr("Bold / italic / strikethrough"), "Ctrl+B / Ctrl+I / Ctrl+Shift+X"],
+                        [qsTr("Markdown link"), "Ctrl+K"],
                         [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
                         [qsTr("Open / Save / Save As"), "Ctrl+O / S / Shift+S"],
                         [qsTr("Print"), "Ctrl+P"],

@@ -1,3 +1,4 @@
+#include <QClipboard>
 #include <QFile>
 #include <QGuiApplication>
 #include "backend.h"
@@ -905,6 +906,123 @@ void Backend::toggleFold(int position) {
             return;
     }
     toggleFoldBlock(block);
+}
+
+// Markdown emphasis on the selection, in one edit so one Undo takes it back. A marker only counts as a whole
+// run, so the "*" of "**bold**" is never taken for italic. With nothing selected it works on the span around
+// the caret: at its end the caret steps past the closing marker (and back in on a second press), anywhere
+// else inside it the markers come off; outside any span it opens an empty pair with the caret between.
+void Backend::toggleWrap(int start, int end, const QString &marker) {
+    if (!m_doc || marker.isEmpty())
+        return;
+    const QString all = m_doc->toPlainText();
+    const int size = all.size(), m = marker.size();
+    const QChar mark = marker[0];
+    start = qBound(0, start, size);
+    end = qBound(start, end, size);
+    auto run = [&](int pos, int step, int limit) {
+        int r = 0;
+        while (pos + r * step != limit && pos + r * step >= 0 && pos + r * step < size && all[pos + r * step] == mark)
+            ++r;
+        return r;
+    };
+    auto holds = [&](int r) { return r == m || (mark == '*' && r == 3); };
+    auto hasMarker = [&](const QString &part) {
+        for (int i = 0; i < part.size();) {
+            if (part[i] != mark) { ++i; continue; }
+            int j = i;
+            while (j < part.size() && part[j] == mark) ++j;
+            if (holds(j - i)) return true;
+            i = j;
+        }
+        return false;
+    };
+    auto replace = [&](int a, int b, const QString &with, int selStart, int selEnd) {
+        QTextCursor c(m_doc);
+        c.setPosition(a);
+        c.setPosition(b, QTextCursor::KeepAnchor);
+        c.insertText(with);
+        emit moved(a + selStart, a + selEnd);
+    };
+
+    if (start == end) {
+        // Look for a span of this marker on the caret's line.
+        const QTextBlock block = m_doc->findBlock(start);
+        const QString line = block.text();
+        const int base = block.position();
+        auto isMark = [&](int i) {
+            if (i < 0 || i + m > line.size() || line.mid(i, m) != marker)
+                return false;
+            int before = 0, after = 0;
+            for (int k = i - 1; k >= 0 && line[k] == mark; --k) ++before;
+            for (int k = i + m; k < line.size() && line[k] == mark; ++k) ++after;
+            return holds(before + m + after) && before == 0;
+        };
+        auto word = [&](int i) { return i >= 0 && i < line.size() && line[i].isLetterOrNumber(); };
+        for (int i = 0; i < line.size(); ++i) {
+            if (!isMark(i) || i + m >= line.size() || line[i + m].isSpace() || word(i - 1))
+                continue;
+            int j = i + m + 1;
+            for (; j < line.size(); ++j)
+                if (isMark(j) && !line[j - 1].isSpace() && !word(j + m))
+                    break;
+            if (j >= line.size())
+                continue;
+            const int caret = start - base;
+            if (caret >= i && caret <= j + m) {
+                if (caret == j)
+                    emit moved(base + j + m, base + j + m);
+                else if (caret == j + m)
+                    emit moved(base + j, base + j);
+                else {
+                    const QString inner = line.mid(i + m, j - i - m);
+                    replace(base + i, base + j + m, inner, caret - i > m ? qMin(caret - i - m, int(inner.size())) : 0,
+                            caret - i > m ? qMin(caret - i - m, int(inner.size())) : 0);
+                }
+                return;
+            }
+            i = j + m - 1;
+        }
+        replace(start, start, marker + marker, m, m);
+        return;
+    }
+
+    const QString selected = all.mid(start, end - start);
+    const QString inner = selected.mid(m, selected.size() - 2 * m);
+    if (holds(run(start - 1, -1, -1)) && holds(run(end, 1, size)) && !hasMarker(selected)) {
+        replace(start - m, end + m, selected, 0, selected.size());
+    } else if (selected.size() >= 2 * m && holds(run(start, 1, end)) && holds(run(end - 1, -1, start - 1))
+               && !hasMarker(inner) && (start == 0 || all[start - 1] != mark) && (end >= size || all[end] != mark)) {
+        replace(start, end, inner, 0, inner.size());
+    } else {
+        replace(start, end, marker + selected + marker, m, m + selected.size());
+    }
+}
+
+// [label](url): the selection becomes the label, and a URL on the clipboard becomes the target.
+void Backend::insertLink(int start, int end) {
+    if (!m_doc)
+        return;
+    const int size = m_doc->characterCount() - 1;
+    start = qBound(0, start, size);
+    end = qBound(start, end, size);
+    QTextCursor c(m_doc);
+    c.setPosition(start);
+    c.setPosition(end, QTextCursor::KeepAnchor);
+    const QString selected = c.selectedText().replace(QChar(0x2029), '\n');
+    QString url = QGuiApplication::clipboard()->text().trimmed();
+    static const QRegularExpression looksLikeUrl("^(https?://|mailto:)\\S+$");
+    if (!looksLikeUrl.match(url).hasMatch())
+        url.clear();
+    const QString label = selected.isEmpty() ? QStringLiteral("link text") : selected;
+    const QString markdown = "[" + label + "](" + (url.isEmpty() ? QStringLiteral("https://") : url) + ")";
+    c.insertText(markdown);
+    if (selected.isEmpty())
+        emit moved(start + 1, start + 1 + label.size());
+    else if (url.isEmpty())
+        emit moved(start + label.size() + 3, start + markdown.size() - 1);
+    else
+        emit moved(start + markdown.size(), start + markdown.size());
 }
 
 // Collapse or expand every item in the selection; "completely" does the same to all their descendants.
