@@ -50,7 +50,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text to Omarchy's size |
 | Ctrl+O / Ctrl+S / Ctrl+Shift+S | Open / Save now / Save As |
 | Ctrl+P | Print what is on screen to the default printer |
-| Ctrl+/ | Show all keys |
+| Ctrl+/ | Show all keys. Type to filter them, Down and Enter to run one, Esc to close |
 | Ctrl+Q | Quit |
 
 Typing `@` and a letter offers a tag that is already in the document (`@M` suggests `@MIT`): Tab, Right, or Enter accepts it, and typing on replaces it.

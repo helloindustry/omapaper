@@ -877,57 +877,184 @@ ApplicationWindow {
             }
         }
 
-        // Every key, on one screen.
+        // Every key, on one screen. Typing filters it, Down picks a row, Enter runs that action.
         Rectangle {
+            id: help
             visible: win.helpVisible
             anchors.fill: parent
             color: Qt.alpha(theme.background, 0.94)
             focus: visible
-            Keys.onEscapePressed: win.helpVisible = false
-            TapHandler { onTapped: win.helpVisible = false }
 
-            GridLayout {
+            property string filter: ""
+            property int picked: -1
+            readonly property real rowHeight: Math.round(win.fs * 1.75)
+            // [label, keys, action]. An action of null is something done with the mouse.
+            readonly property var all: [
+                [qsTr("Toggle done"), "Ctrl+D", () => backend.toggleDone(editor.selectionStart, editor.selectionEnd)],
+                [qsTr("Archive done items / selection"), "Ctrl+Shift+A", () => backend.archive(editor.selectionStart, editor.selectionEnd)],
+                [qsTr("Delete line"), "Ctrl+Shift+K", () => backend.deleteLines(editor.selectionStart, editor.selectionEnd)],
+                [qsTr("Collapse item"), "Ctrl+, / Ctrl+9", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false)],
+                [qsTr("Expand item"), "Ctrl+.", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, false, false)],
+                [qsTr("Collapse everything"), "Ctrl+Shift+,", () => backend.foldAll(true, editor.cursorPosition)],
+                [qsTr("Expand everything"), "Ctrl+Shift+.", () => backend.foldAll(false, editor.cursorPosition)],
+                [qsTr("Indent"), "Tab", () => backend.indent(editor.selectionStart, editor.selectionEnd, 1)],
+                [qsTr("Outdent"), "Shift+Tab", () => backend.indent(editor.selectionStart, editor.selectionEnd, -1)],
+                [qsTr("Move up"), "Ctrl+Shift+Up", () => backend.moveLines(editor.selectionStart, editor.selectionEnd, -1)],
+                [qsTr("Move down"), "Ctrl+Shift+Down", () => backend.moveLines(editor.selectionStart, editor.selectionEnd, 1)],
+                [qsTr("Move to a project"), "Ctrl+Shift+M", () => win.openMove()],
+                [qsTr("Focus in"), "Ctrl+Shift+Right", () => backend.zoomIn(editor.cursorPosition)],
+                [qsTr("Focus out"), "Ctrl+Shift+Left", () => backend.zoomOut()],
+                [qsTr("Home (whole document)"), "Ctrl+H", () => backend.showAll()],
+                [qsTr("Find and replace"), "Ctrl+F", () => win.openFind()],
+                [qsTr("Find next"), "Ctrl+G", () => win.findAgain(false)],
+                [qsTr("Find previous"), "Ctrl+Shift+G", () => win.findAgain(true)],
+                [qsTr("Filter (search bar)"), "Ctrl+Shift+F", () => { win.searchOpen = true; search.forceActiveFocus(); search.selectAll() }],
+                [qsTr("Save search"), "Ctrl+Shift+E", () => backend.saveSearch()],
+                [qsTr("Add a tag to the search"), "Ctrl+click", null],
+                [qsTr("Filter a tag out"), "Ctrl+Shift+click", null],
+                [qsTr("Toggle sidebar"), "Ctrl+Shift+B", () => { win.sidebarVisible = !win.sidebarVisible }],
+                [qsTr("Bold"), "Ctrl+B", () => backend.toggleWrap(editor.selectionStart, editor.selectionEnd, "**")],
+                [qsTr("Italic"), "Ctrl+I", () => backend.toggleWrap(editor.selectionStart, editor.selectionEnd, "*")],
+                [qsTr("Strikethrough"), "Ctrl+Shift+X", () => backend.toggleWrap(editor.selectionStart, editor.selectionEnd, "~~")],
+                [qsTr("Markdown link"), "Ctrl+K", () => backend.insertLink(editor.selectionStart, editor.selectionEnd)],
+                [qsTr("Bigger text"), "Ctrl+=", () => backend.changeFontSize(1)],
+                [qsTr("Smaller text"), "Ctrl+-", () => backend.changeFontSize(-1)],
+                [qsTr("Reset text size"), "Ctrl+0", () => backend.changeFontSize(0)],
+                [qsTr("Open"), "Ctrl+O", () => backend.openDialog()],
+                [qsTr("Save"), "Ctrl+S", () => backend.save()],
+                [qsTr("Save As"), "Ctrl+Shift+S", () => backend.saveAsDialog()],
+                [qsTr("Print"), "Ctrl+P", () => backend.print()],
+                [qsTr("Undo"), "Ctrl+Z", () => editor.undo()],
+                [qsTr("Redo"), "Ctrl+Shift+Z", () => editor.redo()],
+                [qsTr("This list"), "Ctrl+/", null],
+                [qsTr("Quit"), "Ctrl+Q", () => Qt.quit()]
+            ]
+            readonly property var shown: {
+                const q = filter.toLowerCase()
+                return q === "" ? all : all.filter(r => r[0].toLowerCase().indexOf(q) >= 0 || r[1].toLowerCase().indexOf(q) >= 0)
+            }
+
+            function reset() { filter = ""; picked = -1 }
+            function esc(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
+            // The typed part gets the accent colour; everything else is plain.
+            function marked(t, color) {
+                const at = filter === "" ? -1 : t.toLowerCase().indexOf(filter.toLowerCase())
+                if (at < 0)
+                    return esc(t)
+                return esc(t.slice(0, at)) + "<font color=\"" + color + "\">" + esc(t.slice(at, at + filter.length)) + "</font>" + esc(t.slice(at + filter.length))
+            }
+            function dismiss() { win.helpVisible = false; editor.forceActiveFocus() }
+            function run() {
+                const row = shown[picked]
+                if (!row || !row[2])
+                    return
+                dismiss()
+                row[2]()
+            }
+            onVisibleChanged: { reset(); if (visible) forceActiveFocus() }
+            onFilterChanged: picked = -1
+
+            Keys.onEscapePressed: dismiss()
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Down) {
+                    picked = Math.min(shown.length - 1, picked + 1)
+                    helpList.positionViewAtIndex(picked, ListView.Contain)
+                } else if (event.key === Qt.Key_Up) {
+                    picked = Math.max(-1, picked - 1)
+                    if (picked >= 0)
+                        helpList.positionViewAtIndex(picked, ListView.Contain)
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    run()
+                } else if (event.key === Qt.Key_Backspace) {
+                    filter = filter.slice(0, -1)
+                } else if (event.text.length > 0 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127
+                           && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
+                    filter += event.text
+                } else {
+                    return
+                }
+                event.accepted = true
+            }
+            TapHandler { onTapped: help.dismiss() }
+
+            // The box is as tall as the whole list, so filtering never moves where anything starts.
+            Item {
+                id: box
                 anchors.centerIn: parent
-                columns: 2
-                columnSpacing: 32
-                rowSpacing: 6
-                Repeater {
-                    model: [
-                        [qsTr("Toggle done"), "Ctrl+D"],
-                        [qsTr("Archive done items / selection"), "Ctrl+Shift+A"],
-                        [qsTr("Delete line"), "Ctrl+Shift+K"],
-                        [qsTr("Collapse item"), "Ctrl+, / Ctrl+9"],
-                        [qsTr("Expand item"), "Ctrl+."],
-                        [qsTr("Collapse / expand everything"), "Ctrl+Shift+, / Ctrl+Shift+."],
-                        [qsTr("Indent / outdent"), "Tab / Shift+Tab"],
-                        [qsTr("Move up / down"), "Ctrl+Shift+Up / Down"],
-                        [qsTr("Move to a project"), "Ctrl+Shift+M"],
-                        [qsTr("Focus in / out"), "Ctrl+Shift+Right / Left"],
-                        [qsTr("Home (whole document)"), "Ctrl+H"],
-                        [qsTr("Find and replace"), "Ctrl+F"],
-                        [qsTr("Find next / previous"), "Ctrl+G / Ctrl+Shift+G"],
-                        [qsTr("Filter (search bar)"), "Ctrl+Shift+F"],
-                        [qsTr("Save search"), "Ctrl+Shift+E"],
-                        [qsTr("Add a tag to the search"), "Ctrl+click"],
-                        [qsTr("Filter a tag out"), "Ctrl+Shift+click"],
-                        [qsTr("Toggle sidebar"), "Ctrl+Shift+B"],
-                        [qsTr("Bold / italic / strikethrough"), "Ctrl+B / Ctrl+I / Ctrl+Shift+X"],
-                        [qsTr("Markdown link"), "Ctrl+K"],
-                        [qsTr("Bigger / smaller / reset text"), "Ctrl+= / Ctrl+- / Ctrl+0"],
-                        [qsTr("Open / Save / Save As"), "Ctrl+O / S / Shift+S"],
-                        [qsTr("Print"), "Ctrl+P"],
-                        [qsTr("Undo / redo"), "Ctrl+Z / Ctrl+Shift+Z"],
-                        [qsTr("This list"), "Ctrl+/"],
-                        [qsTr("Quit"), "Ctrl+Q"]
-                    ]
+                width: 520
+                height: Math.min(help.parent.height - 48, help.rowHeight * (help.all.length + 2))
+
+                // The typed filter sits on the line above the first row, with a blank line between.
+                Text {
+                    id: typed
+                    visible: help.filter !== ""
+                    text: help.filter
+                    color: theme.accent
+                    font.family: backend.fontFamily
+                    font.pointSize: win.fs - 0.75
+                    height: help.rowHeight
+                    verticalAlignment: Text.AlignVCenter
+                    Rectangle {
+                        id: filterCaret
+                        x: typed.contentWidth
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: parent.contentHeight
+                        width: win.caretWidth
+                        color: win.caretColor
+                        antialiasing: true
+                        Timer {
+                            interval: 530
+                            repeat: true
+                            running: typed.visible
+                            onTriggered: filterCaret.opacity = filterCaret.opacity > 0 ? 0 : 1
+                        }
+                        Connections {
+                            target: help
+                            function onFilterChanged() { filterCaret.opacity = 1 }
+                        }
+                    }
+                }
+
+                ListView {
+                    id: helpList
+                    anchors.top: parent.top
+                    anchors.topMargin: help.rowHeight * 2
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    clip: true
+                    interactive: false
+                    model: help.shown
                     delegate: Item {
                         required property var modelData
                         required property int index
-                        Layout.columnSpan: 2
-                        Layout.preferredWidth: 520
-                        Layout.preferredHeight: Math.round(win.fs * 2.0)
-                        Text { text: modelData[0]; color: theme.foreground; font.family: backend.fontFamily; font.pointSize: win.fs - 0.75 }
-                        Text { anchors.right: parent.right; text: modelData[1]; color: theme.muted; font.family: backend.fontFamily; font.pointSize: win.fs - 0.75 }
+                        width: helpList.width
+                        height: help.rowHeight
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.leftMargin: -8
+                            anchors.rightMargin: -8
+                            radius: 4
+                            color: Qt.alpha(theme.accent, 0.22)
+                            visible: index === help.picked
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.StyledText
+                            text: help.marked(modelData[0], theme.accent)
+                            color: theme.foreground
+                            font.family: backend.fontFamily
+                            font.pointSize: win.fs - 0.75
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.right: parent.right
+                            textFormat: Text.StyledText
+                            text: help.marked(modelData[1], theme.accent)
+                            color: theme.muted
+                            font.family: backend.fontFamily
+                            font.pointSize: win.fs - 0.75
+                        }
                     }
                 }
             }
