@@ -33,6 +33,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+, (or Ctrl+9) | Collapse the item |
 | Ctrl+. | Expand the item |
 | Ctrl+Shift+, | Collapse everything |
+| Ctrl+Alt+Shift+, | Collapse everything except this item |
 | Ctrl+Shift+. | Expand everything |
 | Ctrl+Shift+9 / Ctrl+Shift+0 | Collapse / expand everything |
 | Tab / Shift+Tab (or Ctrl+] / Ctrl+[) | Indent / outdent |
@@ -45,7 +46,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+Shift+F | Filter with the search bar |
 | Ctrl+Shift+E | Save the current search |
 | Ctrl+Shift+B | Toggle sidebar |
-| Ctrl+B / Ctrl+I / Ctrl+Shift+X | Markdown bold / italic / strikethrough on the selection or the word at the caret (Omawrite's keys) |
+| Ctrl+B / Ctrl+I / Ctrl+Shift+X | Markdown bold / italic / strikethrough on the selection, or on the word at the caret when nothing is selected (Omawrite's keys) |
 | Ctrl+K | Markdown link: the selection becomes the label, and a URL on the clipboard the target |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text to Omarchy's size |
 | Ctrl+O / Ctrl+S / Ctrl+Shift+S | Open / Save now / Save As |

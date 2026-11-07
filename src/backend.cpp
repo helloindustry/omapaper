@@ -912,6 +912,21 @@ void Backend::toggleFold(int position) {
 // run, so the "*" of "**bold**" is never taken for italic. With nothing selected it works on the span around
 // the caret: at its end the caret steps past the closing marker (and back in on a second press), anywhere
 // else inside it the markers come off; outside any span it opens an empty pair with the caret between.
+// With nothing selected, the word touching the caret becomes the selection. Returns false when no word touches it.
+static bool selectTouchingWord(const QString &all, int &start, int &end) {
+    if (start != end)
+        return true;
+    auto isWord = [&](int i) { return i >= 0 && i < all.size() && (all[i].isLetterOrNumber() || all[i] == '_'); };
+    if (!isWord(start - 1) && !isWord(start))
+        return false;
+    int a = start, b = start;
+    while (isWord(a - 1)) --a;
+    while (isWord(b)) ++b;
+    start = a;
+    end = b;
+    return true;
+}
+
 void Backend::toggleWrap(int start, int end, const QString &marker) {
     if (!m_doc || marker.isEmpty())
         return;
@@ -920,6 +935,7 @@ void Backend::toggleWrap(int start, int end, const QString &marker) {
     const QChar mark = marker[0];
     start = qBound(0, start, size);
     end = qBound(start, end, size);
+    selectTouchingWord(all, start, end);
     auto run = [&](int pos, int step, int limit) {
         int r = 0;
         while (pos + r * step != limit && pos + r * step >= 0 && pos + r * step < size && all[pos + r * step] == mark)
@@ -1006,6 +1022,7 @@ void Backend::insertLink(int start, int end) {
     const int size = m_doc->characterCount() - 1;
     start = qBound(0, start, size);
     end = qBound(start, end, size);
+    selectTouchingWord(m_doc->toPlainText(), start, end);
     QTextCursor c(m_doc);
     c.setPosition(start);
     c.setPosition(end, QTextCursor::KeepAnchor);
@@ -1097,6 +1114,21 @@ void Backend::foldAll(bool collapse, int position) {
             if (hasChildren(b.blockNumber()))
                 m_folds.append(QTextCursor(b));
     keepCaretVisible(position);
+    refresh();
+    persistCursor();
+}
+
+void Backend::foldOthers(int position) {
+    const int cur = m_doc->findBlock(position).blockNumber();
+    m_folds.clear();
+    for (QTextBlock b = m_doc->begin(); b.isValid(); b = b.next()) {
+        const int n = b.blockNumber();
+        if (!hasChildren(n))
+            continue;
+        const bool keepsOpen = n == cur || (n < cur && cur < foldEnd(n));
+        if (!keepsOpen)
+            m_folds.append(QTextCursor(b));
+    }
     refresh();
     persistCursor();
 }

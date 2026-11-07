@@ -183,6 +183,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: {  if (backend.shiftHeld()) backend.foldAll(false, editor.cursorPosition); else backend.changeFontSize(0) } }
     Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; onActivated: { if (backend.shiftHeld()) backend.foldAll(true, editor.cursorPosition); else backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false) } }
     Shortcut { sequence: "Ctrl+."; context: Qt.ApplicationShortcut; onActivated: { if (backend.shiftHeld()) backend.foldAll(false, editor.cursorPosition); else backend.foldItems(editor.selectionStart, editor.selectionEnd, false, false) } }
+    Shortcut { sequence: "Ctrl+Alt+Shift+,"; context: Qt.ApplicationShortcut; onActivated: backend.foldOthers(editor.cursorPosition) }
     Shortcut { sequence: "Ctrl+]"; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, 1) }
     Shortcut { sequence: "Ctrl+["; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, -1) }
     Shortcut { sequence: "Ctrl+Shift+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
@@ -441,6 +442,8 @@ ApplicationWindow {
                             const ctrlShift = (event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier) && !(event.modifiers & Qt.AltModifier)
                             if (ctrlShift && event.key === Qt.Key_Right) { backend.zoomIn(editor.cursorPosition); event.accepted = true; return }
                             if (ctrlShift && event.key === Qt.Key_Left) { backend.zoomOut(); event.accepted = true; return }
+                            if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier) && (event.modifiers & Qt.AltModifier)
+                                    && (event.key === Qt.Key_Comma || event.key === Qt.Key_Less)) { backend.foldOthers(editor.cursorPosition); event.accepted = true; return }
                             // Collapse / expand all. The shortcuts above can miss when the keyboard reports Shift+9 as "(" and
                             // Shift+0 as ")", so the editor answers those keys itself.
                             if (ctrlShift && (event.key === Qt.Key_Comma || event.key === Qt.Key_Less)) { backend.foldAll(true, editor.cursorPosition); event.accepted = true; return }
@@ -897,6 +900,7 @@ ApplicationWindow {
                 [qsTr("Expand item"), "Ctrl+.", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, false, false)],
                 [qsTr("Collapse everything"), "Ctrl+Shift+,", () => backend.foldAll(true, editor.cursorPosition)],
                 [qsTr("Expand everything"), "Ctrl+Shift+.", () => backend.foldAll(false, editor.cursorPosition)],
+                [qsTr("Collapse everything except this item"), "Ctrl+Alt+Shift+,", () => backend.foldOthers(editor.cursorPosition)],
                 [qsTr("Indent"), "Tab", () => backend.indent(editor.selectionStart, editor.selectionEnd, 1)],
                 [qsTr("Outdent"), "Shift+Tab", () => backend.indent(editor.selectionStart, editor.selectionEnd, -1)],
                 [qsTr("Move up"), "Ctrl+Shift+Up", () => backend.moveLines(editor.selectionStart, editor.selectionEnd, -1)],

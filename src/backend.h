@@ -76,6 +76,7 @@ public:
     Q_INVOKABLE void toggleFold(int position);
     Q_INVOKABLE void toggleFoldBlock(int block);
     Q_INVOKABLE void foldAll(bool collapse, int position = -1); // position: the caret, kept where it is unless a fold hides its line
+    Q_INVOKABLE void foldOthers(int position); // folds everything except the item at the caret and the items that contain it
     void keepCaretVisible(int position);
     Q_INVOKABLE bool shiftHeld() const; // Qt matches Ctrl+Shift+key to a plain Ctrl+key shortcut, so those ask
     Q_INVOKABLE void toggleWrap(int start, int end, const QString &marker); // **bold**, *italic*, ~~strike~~ on the selection or the word span at the caret
