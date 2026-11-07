@@ -1,3 +1,4 @@
+#include <QGuiApplication>
 #include "backend.h"
 
 #include <QDate>
@@ -942,6 +943,8 @@ void Backend::foldItems(int start, int end, bool collapse, bool completely) {
     refresh();
     persistCursor();
 }
+
+bool Backend::shiftHeld() const { return QGuiApplication::keyboardModifiers() & Qt::ShiftModifier; }
 
 void Backend::toggleFoldAll() { foldAll(m_folds.isEmpty()); }
 

@@ -170,12 +170,12 @@ ApplicationWindow {
     Shortcut { sequences: ["Ctrl+D", "Ctrl+Return", "Ctrl+Enter"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleDone(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+K"; context: Qt.ApplicationShortcut; onActivated: backend.deleteLines(editor.selectionStart, editor.selectionEnd) }
     Shortcut { sequence: "Ctrl+Shift+A"; context: Qt.ApplicationShortcut; onActivated: backend.archive(editor.selectionStart, editor.selectionEnd) }
-    Shortcut { sequence: "Ctrl+9"; context: Qt.ApplicationShortcut; onActivated: backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false) }
-    Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: backend.changeFontSize(0) }
+    Shortcut { sequence: "Ctrl+9"; context: Qt.ApplicationShortcut; onActivated: { if (backend.shiftHeld()) backend.foldAll(true); else backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false) } }
+    Shortcut { sequence: "Ctrl+0"; context: Qt.ApplicationShortcut; onActivated: { if (backend.shiftHeld()) backend.foldAll(false); else backend.changeFontSize(0) } }
     Shortcut { sequences: ["Ctrl+Shift+.", "Ctrl+>", "Ctrl+Shift+>"]; context: Qt.ApplicationShortcut; onActivated: backend.toggleFoldAll() }
     Shortcut { sequences: ["Ctrl+Shift+9", "Ctrl+(", "Ctrl+Shift+("]; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(true) }
     Shortcut { sequences: ["Ctrl+Shift+0", "Ctrl+)", "Ctrl+Shift+)"]; context: Qt.ApplicationShortcut; onActivated: backend.foldAll(false) }
-    Shortcut { sequence: "Ctrl+."; context: Qt.ApplicationShortcut; onActivated: backend.toggleFold(editor.cursorPosition) }
+    Shortcut { sequence: "Ctrl+."; context: Qt.ApplicationShortcut; onActivated: { if (backend.shiftHeld()) backend.toggleFoldAll(); else backend.toggleFold(editor.cursorPosition) } }
     Shortcut { sequence: "Ctrl+]"; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, 1) }
     Shortcut { sequence: "Ctrl+["; context: Qt.ApplicationShortcut; onActivated: backend.indent(editor.selectionStart, editor.selectionEnd, -1) }
     Shortcut { sequence: "Ctrl+Shift+Up"; context: Qt.ApplicationShortcut; onActivated: backend.moveLines(editor.selectionStart, editor.selectionEnd, -1) }
