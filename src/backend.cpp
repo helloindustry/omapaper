@@ -1650,10 +1650,10 @@ void Backend::duplicateLines(int start, int end) {
     emit cursorRequested(m_doc->findBlockByNumber(range.first + count).position() + column);
 }
 
-// Cut. When what is selected is whole lines and one of them has children (folded or not), the children go too,
-// and the lines leave no gap behind. The text on the clipboard is those lines, children included.
-// Anything else (part of a line, items with nothing under them) is left to the ordinary cut.
-bool Backend::cutItems(int start, int end) {
+// What a cut or copy of this selection should take: when it is whole lines and one of them has children (folded or
+// not), those lines plus every child, as first and last line numbers. Anything else (part of a line, items with
+// nothing under them) is left to the ordinary cut and copy, and this says false.
+bool Backend::itemSelection(int start, int end, int &firstLine, int &lastLine) const {
     if (!m_doc || end <= start)
         return false;
     const QTextBlock first = m_doc->findBlock(start);
@@ -1677,13 +1677,35 @@ bool Backend::cutItems(int start, int end) {
             last = qMax(last, foldEnd(i) - 1);
     while (last > range.second && parseLine(m_doc->findBlockByNumber(last).text()).type == Item::Blank)
         --last; // spacing after the items stays behind
+    firstLine = range.first;
+    lastLine = last;
+    return true;
+}
 
+static void putLinesOnClipboard(QTextDocument *doc, int first, int last) {
     QStringList lines;
-    for (int i = range.first; i <= last; ++i)
-        lines << m_doc->findBlockByNumber(i).text();
+    for (int i = first; i <= last; ++i)
+        lines << doc->findBlockByNumber(i).text();
     QGuiApplication::clipboard()->setText(lines.join('\n') + '\n');
+}
+
+// Cut: the items and their children go to the clipboard and leave no gap behind.
+bool Backend::cutItems(int start, int end) {
+    int first, last;
+    if (!itemSelection(start, end, first, last))
+        return false;
+    putLinesOnClipboard(m_doc, first, last);
     const QTextBlock to = m_doc->findBlockByNumber(last);
-    deleteLines(m_doc->findBlockByNumber(range.first).position(), to.position() + to.length() - 1);
+    deleteLines(m_doc->findBlockByNumber(first).position(), to.position() + to.length() - 1);
+    return true;
+}
+
+// Copy: the same lines, children included, and the document is left alone.
+bool Backend::copyItems(int start, int end) {
+    int first, last;
+    if (!itemSelection(start, end, first, last))
+        return false;
+    putLinesOnClipboard(m_doc, first, last);
     return true;
 }
 

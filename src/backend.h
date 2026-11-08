@@ -59,6 +59,7 @@ public:
     void saveOnQuit(); // save, and keep a rescue copy if the file can't be written
     QString readOnlyMessage() const;
     QVariantList projectList(int skipFrom, int skipTo) const;
+    bool itemSelection(int start, int end, int &firstLine, int &lastLine) const;
     Q_INVOKABLE void saveNow(); // Ctrl+S: saves, and says so even when autosave had already written everything
     Q_INVOKABLE void saveSidebarWidth();
     Q_INVOKABLE bool caretThemed() const; // false means the iA blue caret; the theme's accent is the default
@@ -113,7 +114,8 @@ public:
     Q_INVOKABLE void indent(int start, int end, int direction);
     Q_INVOKABLE void toggleDone(int start, int end);
     Q_INVOKABLE void duplicateLines(int start, int end); // copies the lines touched, plus their children, just below them
-    Q_INVOKABLE bool cutItems(int start, int end); // Ctrl+X on whole lines takes their children along; false means do an ordinary cut
+    Q_INVOKABLE bool cutItems(int start, int end);  // Ctrl+X on whole lines takes their children along; false means do an ordinary cut
+    Q_INVOKABLE bool copyItems(int start, int end); // Ctrl+C likewise
     Q_INVOKABLE void deleteLines(int start, int end); // the lines touched by the selection, plus anything folded inside them
     Q_INVOKABLE void archive(int start, int end); // the selection, or every @done item when nothing is selected
     Q_INVOKABLE QVariantList projectTargets() const; // every project, for "go to project"
