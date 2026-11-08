@@ -104,6 +104,7 @@ public:
     Q_INVOKABLE QString tagAt(int position) const;  // the search for the tag under a character, or empty
     Q_INVOKABLE QString linkAt(int position) const; // the address under a character, or empty
     Q_INVOKABLE void setHover(int start, int end); // underline a tag or link while the pointer is over it
+    Q_INVOKABLE bool positionVisible(int position) const; // false on a line that is folded or filtered away
     Q_INVOKABLE int endOfVisible() const; // end of the last visible line
     Q_INVOKABLE int blockPosition(int block) const; // where a line starts; the fold arrows follow it
     Q_INVOKABLE void removeTag(int position); // deletes the tag under this character, with one space beside it

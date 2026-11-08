@@ -882,17 +882,20 @@ void Backend::refresh() {
     }
     m_tagCounts = counts;
     // Each tag, and under it the distinct values it has been given; a tag with values can be collapsed.
-    for (auto it = values.begin(); it != values.end(); ++it) {
-        QStringList sorted = it.value();
+    // The tags run A to Z, ignoring case (a plain map would put every capital letter before every small one).
+    QStringList tagNames = values.keys();
+    tagNames.sort(Qt::CaseInsensitive);
+    for (const QString &tagName : tagNames) {
+        QStringList sorted = values.value(tagName);
         sorted.sort(Qt::CaseInsensitive);
-        const bool collapsed = m_collapsedTags.contains(it.key());
-        tags << QVariantMap{{"kind", "tag"}, {"label", "@" + it.key()}, {"name", it.key()}, {"query", "@" + it.key()},
+        const bool collapsed = m_collapsedTags.contains(tagName);
+        tags << QVariantMap{{"kind", "tag"}, {"label", "@" + tagName}, {"name", tagName}, {"query", "@" + tagName},
                             {"level", 0}, {"foldable", !sorted.isEmpty()}, {"collapsed", collapsed}};
         if (collapsed)
             continue;
         for (const auto &value : sorted)
             tags << QVariantMap{{"kind", "tag"}, {"label", value}, {"level", 1}, {"foldable", false},
-                                {"query", "@" + it.key() + " = " + value}};
+                                {"query", "@" + tagName + " = " + value}};
     }
 
     QVariantList sidebar;
@@ -909,8 +912,19 @@ void Backend::refresh() {
         emit sidebarChanged();
     }
     emit zoomChanged(); // the zoomed line may have been renamed
-    if (!m_extras.isEmpty())
+    // Extra carets on lines that folding, zooming or a search has just hidden would be drawn in empty space; drop them.
+    if (!m_extras.isEmpty()) {
+        QList<QTextCursor> keep;
+        for (const auto &c : m_extras)
+            if (c.block().isVisible())
+                keep << c;
+        m_extras = keep;
         emit extraCursorsChanged();
+    }
+}
+
+bool Backend::positionVisible(int position) const {
+    return !m_doc || m_doc->findBlock(position).isVisible();
 }
 
 int Backend::parentBlock(int block) const {

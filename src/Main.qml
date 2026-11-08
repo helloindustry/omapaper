@@ -659,7 +659,9 @@ ApplicationWindow {
                         // The one non-stock touch: a blue caret, a hair thicker than the default.
                         cursorDelegate: Rectangle {
                             id: caret
-                            visible: editor.activeFocus // hidden while the search bar has the focus
+                            // Hidden while the search bar has the focus, and when the caret sits on a line that is folded or filtered
+                            // away (it would otherwise be drawn in empty space). The reads below make this follow those changes.
+                            visible: editor.activeFocus && (backend.folds, backend.query, backend.zoomBlock, backend.positionVisible(editor.cursorPosition))
                             width: win.caretWidth
                             color: win.caretColor
                             antialiasing: true
