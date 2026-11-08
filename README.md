@@ -5,20 +5,6 @@ A plain-text task outliner for Omarchy, in the style of [TaskPaper](https://www.
 
 ![TaskPaper](docs/screenshot.png)
 
-## Install
-
-On Omarchy or any Arch-based system, build it from source (needs `qt6-base`, `qt6-declarative`, `qt6-wayland` and `xdg-desktop-portal`):
-
-```
-git clone https://github.com/helloindustry/taskpaper
-cd taskpaper
-bin/install
-```
-
-`bin/build` only compiles it (the binary lands in `build/taskpaper`), `bin/test` runs the tests.
-
-Early software: it writes to your files as you type, so keep a backup (or a synced folder) of anything that matters.
-
 ```
 Inbox:
 	- this is a task
@@ -38,6 +24,20 @@ If the file changes on disk (say, another computer editing it through a sync ser
 `taskpaper [file]` opens a specific file. Click a tag in the document or the sidebar to search for it. Ctrl+click adds another tag to the search (`@a and @b`), and Ctrl+Shift+click filters one out (`not @a`); do the same again to take it back out of the search. Ctrl+Shift+Alt+click on a tag in the document removes it from its line. Typing `@` in the search bar lists the document's tags (Down/Up, then Enter or Tab to complete; Esc closes the list). Ctrl+Up and Ctrl+Down move the selection in the sidebar. Search syntax: `@done`, `not @done`,
 `@due < today`, `not @tag` (hides those items and everything under them), `project Inbox`, `task milk`, joined with `and` / `or`.
 Saved searches live in the file under a `Searches:` project as `@search(query)`. The editor hides that project; they show only in the sidebar. To delete one, click it, press Delete, then `y` (or `n` / Esc to cancel).
+
+## Install
+
+On Omarchy or any Arch-based system, build it from source (needs `qt6-base`, `qt6-declarative`, `qt6-wayland` and `xdg-desktop-portal`):
+
+```
+git clone https://github.com/helloindustry/taskpaper
+cd taskpaper
+bin/install
+```
+
+`bin/build` only compiles it (the binary lands in `build/taskpaper`), `bin/test` runs the tests.
+
+Early software: it writes to your files as you type, so keep a backup (or a synced folder) of anything that matters.
 
 ## Keys (TaskPaper's, with Ctrl for Command)
 
@@ -90,3 +90,7 @@ Text is Omarchy's monospace font (iA Writer Mono S by default) at the size of Om
 ## Markdown (only if you type it)
 
 `**bold**`, `*italic*` / `_italic_`, `***both***`, `~~strike~~` and `` `code` `` are styled as you type, with the markers dimmed. The text is never changed. Markers need a non-space inside and a word edge outside, so `2*3*4`, `snake_case`, URLs and tags in ordinary TaskPaper lines look exactly as before.
+
+## Support
+
+TaskPaper for Omarchy is free. If it earns a place in your day and you'd like to help keep it going, you can support it on [Ko-fi](https://ko-fi.com/nathankpeterson).
