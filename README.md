@@ -1,19 +1,13 @@
-# Omapaper
+# TaskPaper
 
 A plain-text task outliner for Omarchy, in the style of [TaskPaper](https://www.taskpaper.com). Open it and type: the document is an ordinary
 `.taskpaper` (or `.txt`) file, and the styling follows what you write.
 
-![Omapaper](docs/screenshot.png)
+![TaskPaper](docs/screenshot.png)
 
 ## Install
 
-On Omarchy or any Arch-based system:
-
-```
-yay -S omapaper
-```
-
-Or build it yourself (needs `qt6-base`, `qt6-declarative`, `qt6-wayland` and `xdg-desktop-portal`):
+On Omarchy or any Arch-based system, build it from source (needs `qt6-base`, `qt6-declarative`, `qt6-wayland` and `xdg-desktop-portal`):
 
 ```
 git clone https://github.com/helloindustry/omapaper
@@ -21,7 +15,7 @@ cd omapaper
 bin/install
 ```
 
-`bin/build` only compiles it (the binary lands in `build/omapaper`), `bin/test` runs the tests.
+`bin/build` only compiles it (the binary lands in `build/taskpaper`), `bin/test` runs the tests.
 
 Early software: it writes to your files as you type, so keep a backup (or a synced folder) of anything that matters.
 
@@ -41,7 +35,7 @@ Links (`https://…`, `www.…`, `mailto:`) are underlined and open in your brow
 
 If the file changes on disk (say, another computer editing it through a sync service), the open window updates in place within a moment, keeping your caret, folds and zoom. Edits in different places merge; if you both edit the same spot, yours is kept and theirs is saved beside it as `name (conflict …)`.
 
-`omapaper [file]` opens a specific file. Click a tag in the document or the sidebar to search for it. Ctrl+click adds another tag to the search (`@a and @b`), and Ctrl+Shift+click filters one out (`not @a`); do the same again to take it back out of the search. Ctrl+Shift+Alt+click on a tag in the document removes it from its line. Typing `@` in the search bar lists the document's tags (Down/Up, then Enter or Tab to complete; Esc closes the list). Ctrl+Up and Ctrl+Down move the selection in the sidebar. Search syntax: `@done`, `not @done`,
+`taskpaper [file]` opens a specific file. Click a tag in the document or the sidebar to search for it. Ctrl+click adds another tag to the search (`@a and @b`), and Ctrl+Shift+click filters one out (`not @a`); do the same again to take it back out of the search. Ctrl+Shift+Alt+click on a tag in the document removes it from its line. Typing `@` in the search bar lists the document's tags (Down/Up, then Enter or Tab to complete; Esc closes the list). Ctrl+Up and Ctrl+Down move the selection in the sidebar. Search syntax: `@done`, `not @done`,
 `@due < today`, `not @tag` (hides those items and everything under them), `project Inbox`, `task milk`, joined with `and` / `or`.
 Saved searches live in the file under a `Searches:` project as `@search(query)`. The editor hides that project; they show only in the sidebar. To delete one, click it, press Delete, then `y` (or `n` / Esc to cancel).
 

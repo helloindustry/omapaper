@@ -1,4 +1,4 @@
-// omapaper — a plain-text outliner for tasks, in the style of TaskPaper.
+// taskpaper — a plain-text outliner for tasks, in the style of TaskPaper.
 
 #include <QGuiApplication>
 #include <QIcon>
@@ -13,21 +13,22 @@
 #include "theme.h"
 #include "translator.h"
 
-static const char *usage = "Usage: omapaper [FILE]\n\n"
+static const char *usage = "Usage: taskpaper [FILE]\n\n"
     "Opens FILE, a TaskPaper (.taskpaper or .txt) outline, or the last file you had open. Edits are saved\n"
-    "as you type. omapaper is a graphical app and keeps running until its window is closed.\n\n"
+    "as you type. taskpaper is a graphical app and keeps running until its window is closed.\n\n"
     "Options:\n"
     "  -h, --help     Show this message and exit\n"
     "  -v, --version  Show the version and exit\n";
 
-// The app used to be called taskpaper. The first run under the new name takes its saved settings along
-// (caret position, folds, font size, sidebar, caret colour), so nothing starts over.
+// For a while the app was called omapaper. A first run under this name takes along whatever it saved then
+// (caret position, folds, font size, sidebar, caret colour), once, so nothing starts over.
 static void migrateSettings() {
-    QSettings old("taskpaper", "taskpaper"), now("omapaper", "omapaper");
-    if (!now.allKeys().isEmpty() || old.allKeys().isEmpty())
+    QSettings old("omapaper", "omapaper"), now("taskpaper", "taskpaper");
+    if (old.allKeys().isEmpty() || now.value("takenFromOmapaper").toBool())
         return;
     for (const QString &key : old.allKeys())
         now.setValue(key, old.value(key));
+    now.setValue("takenFromOmapaper", true);
     now.sync();
 }
 
@@ -40,15 +41,15 @@ int main(int argc, char *argv[]) {
             return 0;
         }
         if (arg == "-v" || arg == "--version") {
-            puts("omapaper 0.1.0");
+            puts("taskpaper 0.1.0");
             return 0;
         }
     }
     QGuiApplication app(argc, argv);
-    app.setApplicationName("omapaper");
+    app.setApplicationName("taskpaper");
     app.setApplicationVersion("0.1.0");
-    app.setDesktopFileName("omapaper");
-    app.setWindowIcon(QIcon::fromTheme("omapaper"));
+    app.setDesktopFileName("taskpaper");
+    app.setWindowIcon(QIcon::fromTheme("taskpaper"));
 
     migrateSettings();
     QQuickStyle::setStyle("Material");
