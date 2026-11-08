@@ -51,6 +51,7 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | --- | --- |
 | Ctrl+D (or Ctrl+Enter) | Toggle done (adds `@done(today)`) |
 | Ctrl+Shift+D | Duplicate the item (or every selected line) with its children, just below |
+| Ctrl+X | Cut. When whole lines are selected, the items under them come along (folded or not) and leave no gap; the clipboard holds all of them |
 | Ctrl+Shift+K | Delete the whole line (or every selected line; a folded item takes its hidden lines with it) |
 | Ctrl+Shift+A | Archive the selection, or every `@done` item if nothing is selected |
 | Ctrl+, | Collapse the item |

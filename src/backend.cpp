@@ -1650,6 +1650,43 @@ void Backend::duplicateLines(int start, int end) {
     emit cursorRequested(m_doc->findBlockByNumber(range.first + count).position() + column);
 }
 
+// Cut. When what is selected is whole lines and one of them has children (folded or not), the children go too,
+// and the lines leave no gap behind. The text on the clipboard is those lines, children included.
+// Anything else (part of a line, items with nothing under them) is left to the ordinary cut.
+bool Backend::cutItems(int start, int end) {
+    if (!m_doc || end <= start)
+        return false;
+    const QTextBlock first = m_doc->findBlock(start);
+    if (!first.text().left(start - first.position()).trimmed().isEmpty())
+        return false; // starts partway through a line
+    const auto range = blockRange(start, end);
+    const QTextBlock lastSelected = m_doc->findBlockByNumber(range.second);
+    if (end >= lastSelected.position() && !lastSelected.text().mid(end - lastSelected.position()).trimmed().isEmpty())
+        return false; // ends partway through a line
+    bool parent = false;
+    for (int i = range.first; i <= range.second && !parent; ++i)
+        parent = hasChildren(i);
+    if (!parent)
+        return false;
+
+    int last = range.second;
+    for (int i = range.first; i <= range.second; ++i) // every selected item brings its whole subtree
+        last = qMax(last, subtreeEnd(i) - 1);
+    for (int i = range.first; i <= last; ++i)
+        if (foldIndex(i) >= 0)
+            last = qMax(last, foldEnd(i) - 1);
+    while (last > range.second && parseLine(m_doc->findBlockByNumber(last).text()).type == Item::Blank)
+        --last; // spacing after the items stays behind
+
+    QStringList lines;
+    for (int i = range.first; i <= last; ++i)
+        lines << m_doc->findBlockByNumber(i).text();
+    QGuiApplication::clipboard()->setText(lines.join('\n') + '\n');
+    const QTextBlock to = m_doc->findBlockByNumber(last);
+    deleteLines(m_doc->findBlockByNumber(range.first).position(), to.position() + to.length() - 1);
+    return true;
+}
+
 // Moves items under an "Archive:" project at the bottom of the file, the way TaskPaper does: they go in at
 // the top of the project, keep their children, tags and @done, and gain @project(Parent / Child) naming
 // where they came from. With nothing selected it archives every @done item, as TaskPaper's command does.

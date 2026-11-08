@@ -695,6 +695,9 @@ ApplicationWindow {
                             if (win.sidebarVisible && event.modifiers === Qt.ControlModifier && (event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
                                 win.stepSidebar(event.key === Qt.Key_Up ? -1 : 1); event.accepted = true; return
                             }
+                            // Cut: whole lines take their children with them.
+                            if ((event.key === Qt.Key_X && event.modifiers === Qt.ControlModifier || event.key === Qt.Key_Delete && event.modifiers === Qt.ShiftModifier)
+                                    && backend.cutItems(editor.selectionStart, editor.selectionEnd)) { event.accepted = true; return }
                             if (ctrlShift && event.key === Qt.Key_Right) { backend.zoomIn(editor.cursorPosition); event.accepted = true; return }
                             if (ctrlShift && event.key === Qt.Key_Left) { backend.zoomOut(); event.accepted = true; return }
                             if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier) && (event.modifiers & Qt.AltModifier)
