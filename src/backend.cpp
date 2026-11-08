@@ -693,10 +693,13 @@ void Backend::refresh() {
 
     // Parent and end of each item's subtree; blank lines belong to whatever surrounds them.
     QVector<int> parent(n, -1), end(n, n), stack;
+    QVector<bool> flat(n, false);
+    for (int i = 0; i < n; ++i)
+        flat[i] = isFlatProject(items, i);
     for (int i = 0; i < n; ++i) {
         if (items[i].type == Item::Blank)
             continue;
-        while (!stack.isEmpty() && endsSubtree(items[stack.last()], items[i]))
+        while (!stack.isEmpty() && endsSubtree(items[stack.last()], items[i], flat[stack.last()]))
             end[stack.takeLast()] = i;
         parent[i] = stack.isEmpty() ? -1 : stack.last();
         stack.append(i);
@@ -879,7 +882,7 @@ int Backend::parentBlock(int block) const {
     const Item item = parseLine(m_doc->findBlockByNumber(block).text());
     for (QTextBlock b = m_doc->findBlockByNumber(block).previous(); b.isValid(); b = b.previous()) {
         const Item other = parseLine(b.text());
-        if (other.type != Item::Blank && !endsSubtree(other, item))
+        if (other.type != Item::Blank && !endsSubtree(other, item, blockIsFlatProject(b)))
             return b.blockNumber();
     }
     return -1;
@@ -1354,12 +1357,27 @@ QPair<int, int> Backend::blockRange(int start, int end) const {
     return {first.blockNumber(), last.blockNumber()};
 }
 
+// isFlatProject() for a line of the document.
+bool Backend::blockIsFlatProject(const QTextBlock &block) const {
+    const Item item = parseLine(block.text());
+    if (item.type != Item::Project)
+        return false;
+    for (QTextBlock b = block.next(); b.isValid(); b = b.next()) {
+        const Item next = parseLine(b.text());
+        if (next.type != Item::Blank)
+            return next.indent <= item.indent;
+    }
+    return true;
+}
+
 int Backend::subtreeEnd(int block) const {
-    const Item root = parseLine(m_doc->findBlockByNumber(block).text());
+    const QTextBlock rootBlock = m_doc->findBlockByNumber(block);
+    const Item root = parseLine(rootBlock.text());
+    const bool flat = blockIsFlatProject(rootBlock);
     int i = block + 1;
     for (QTextBlock b = m_doc->findBlockByNumber(i); b.isValid(); b = b.next(), ++i) {
         const Item item = parseLine(b.text());
-        if (item.type != Item::Blank && endsSubtree(root, item))
+        if (item.type != Item::Blank && endsSubtree(root, item, flat))
             break;
     }
     return i;

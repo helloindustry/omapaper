@@ -60,6 +60,7 @@ public:
     QString readOnlyMessage() const;
     QVariantList projectList(int skipFrom, int skipTo) const;
     bool itemSelection(int start, int end, int &firstLine, int &lastLine) const;
+    bool blockIsFlatProject(const QTextBlock &block) const;
     Q_INVOKABLE void saveNow(); // Ctrl+S: saves, and says so even when autosave had already written everything
     Q_INVOKABLE void saveSidebarWidth();
     Q_INVOKABLE bool caretThemed() const; // false means the iA blue caret; the theme's accent is the default

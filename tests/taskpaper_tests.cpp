@@ -46,6 +46,24 @@ private slots:
         QVERIFY(Query::parse("project Inbox").matches(parseLine("Inbox:")));
     }
 
+    void subtrees()
+    {
+        // A list typed without indenting: the project keeps the plain lines under it until the next project.
+        QVector<Item> flat = {parseLine("Inbox:"), parseLine("- a"), parseLine("- b"), parseLine("Work:")};
+        QVERIFY(isFlatProject(flat, 0));
+        QVERIFY(!endsSubtree(flat[0], flat[1], true));
+        QVERIFY(endsSubtree(flat[0], flat[3], true));
+        // A project with indented contents ends with the indenting; same-level tasks after it are its siblings.
+        QVector<Item> nested = {parseLine("\tUI appeal:"), parseLine("\t\t- call"), parseLine("\t\tnotes"), parseLine("\t- sibling task"), parseLine("\tOther:")};
+        QVERIFY(!isFlatProject(nested, 0));
+        QVERIFY(!endsSubtree(nested[0], nested[1], false));
+        QVERIFY(endsSubtree(nested[0], nested[3], false));
+        QVERIFY(endsSubtree(nested[0], nested[4], false));
+        // Blank lines don't decide it.
+        QVector<Item> spaced = {parseLine("Home:"), parseLine(""), parseLine("\t- x")};
+        QVERIFY(!isFlatProject(spaced, 0));
+    }
+
     void dateWords()
     {
         const QDate today = QDate::currentDate();

@@ -36,13 +36,25 @@ struct Link {
 QList<Link> findLinks(const QString &line);
 
 // Whether `next` (a non-blank item after `root`) falls outside root's children.
-// Children are normally the deeper-indented lines. A project also keeps the plain
-// tasks and notes that follow it at its own level, so a list typed without
-// indenting still folds, zooms, and filters as one project until the next project.
-inline bool endsSubtree(const Item &root, const Item &next) {
+// Children are the deeper-indented lines. The one exception is a project with nothing indented under it
+// (`flat`): it also keeps the plain tasks and notes that follow it at its own level, so a list typed
+// without indenting still folds, zooms, and filters as one project until the next project. A project
+// that does have indented contents ends where the indenting does, as in TaskPaper.
+inline bool endsSubtree(const Item &root, const Item &next, bool flat = false) {
     if (next.indent != root.indent)
         return next.indent < root.indent;
-    return !(root.type == Item::Project && next.type != Item::Project);
+    return !(flat && root.type == Item::Project && next.type != Item::Project);
+}
+
+// For a project at line `i` of `items`: nothing is indented under it (the first line after it that isn't blank
+// is at its own level or shallower, or it is the last line).
+inline bool isFlatProject(const QVector<Item> &items, int i) {
+    if (items[i].type != Item::Project)
+        return false;
+    for (int j = i + 1; j < items.size(); ++j)
+        if (items[j].type != Item::Blank)
+            return items[j].indent <= items[i].indent;
+    return true;
 }
 
 // A search such as `@due < today and not @done`, `project Inbox`, or `milk or eggs`.
