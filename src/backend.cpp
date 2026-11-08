@@ -179,6 +179,9 @@ void Backend::load(const QString &requested) {
         if (block < m_doc->blockCount() && foldIndex(block) < 0 && hasChildren(block))
             m_folds.append(QTextCursor(m_doc->findBlockByNumber(block)));
     }
+    m_collapsedProjects.clear();
+    for (const QString &path : QSettings("taskpaper", "taskpaper").value("collapsedProjects/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding))).toString().split('\n', Qt::SkipEmptyParts))
+        m_collapsedProjects.insert(path);
     m_collapsedTags.clear();
     for (const QString &name : QSettings("taskpaper", "taskpaper").value("collapsedTags/" + QString::fromLatin1(path.toUtf8().toBase64(QByteArray::Base64UrlEncoding))).toString().split(',', Qt::SkipEmptyParts))
         m_collapsedTags.insert(name);
@@ -295,6 +298,13 @@ void Backend::saveSidebarWidth() { QSettings("taskpaper", "taskpaper").setValue(
 bool Backend::sidebarShown() const { return QSettings("taskpaper", "taskpaper").value("sidebarShown", true).toBool(); }
 void Backend::setSidebarShown(bool shown) { QSettings("taskpaper", "taskpaper").setValue("sidebarShown", shown); }
 
+void Backend::toggleProjectFold(const QString &path) {
+    if (!m_collapsedProjects.remove(path))
+        m_collapsedProjects.insert(path);
+    refresh();
+    persistCursor();
+}
+
 void Backend::toggleTagFold(const QString &name) {
     if (!m_collapsedTags.remove(name))
         m_collapsedTags.insert(name);
@@ -396,6 +406,9 @@ void Backend::persistCursor() {
     QStringList tags = m_collapsedTags.values();
     tags.sort();
     settings.setValue("collapsedTags/" + key, tags.join(','));
+    QStringList projects = m_collapsedProjects.values();
+    projects.sort();
+    settings.setValue("collapsedProjects/" + key, projects.join('\n'));
 }
 
 void Backend::save() {
@@ -824,6 +837,8 @@ void Backend::refresh() {
     }
 
     QVariantList projects, tags, searches;
+    QList<QPair<int, QString>> pathStack; // the projects above this line, as (indent, path)
+    int hideBelow = -1;                   // while >= 0, projects indented deeper than this are folded away
     QMap<QString, QStringList> values;
     QMap<QString, int> counts;
     for (int i = 0; i < n; ++i) {
@@ -836,8 +851,28 @@ void Backend::refresh() {
         }
         if (inSearches[i])
             continue;
-        if (item.type == Item::Project)
-            projects << QVariantMap{{"kind", "project"}, {"label", item.title}, {"level", item.indent / 4}, {"block", i}};
+        if (item.type == Item::Project) {
+            // A project that has projects nested in it folds in the sidebar, remembered by its path (Parent/Child).
+            while (!pathStack.isEmpty() && pathStack.last().first >= item.indent)
+                pathStack.removeLast();
+            const QString path = (pathStack.isEmpty() ? QString() : pathStack.last().second + "/") + item.title;
+            pathStack.append({item.indent, path});
+            if (hideBelow >= 0 && item.indent > hideBelow)
+                continue; // inside a collapsed project
+            hideBelow = -1;
+            bool nested = false;
+            for (int k = i + 1; k < n; ++k) {
+                if (items[k].type != Item::Project || items[k].hasTag("search") || inSearches[k])
+                    continue;
+                nested = items[k].indent > item.indent;
+                break;
+            }
+            const bool collapsed = nested && m_collapsedProjects.contains(path);
+            if (collapsed)
+                hideBelow = item.indent;
+            projects << QVariantMap{{"kind", "project"}, {"label", item.title}, {"level", item.indent / 4}, {"block", i},
+                                    {"path", path}, {"foldable", nested}, {"collapsed", collapsed}};
+        }
         for (const auto &tag : item.tags) {
             counts[tag.name]++;
             QStringList &list = values[tag.name];

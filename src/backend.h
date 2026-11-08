@@ -67,6 +67,7 @@ public:
     Q_INVOKABLE void setCaretThemed(bool themed);
     Q_INVOKABLE QVariantList lineRange(int position) const; // the line's own text
     Q_INVOKABLE void toggleTagFold(const QString &name);
+    Q_INVOKABLE void toggleProjectFold(const QString &path); // a project with projects inside folds in the sidebar
     Q_INVOKABLE bool sidebarShown() const;
     Q_INVOKABLE void setSidebarShown(bool shown);
     // More than one caret: Ctrl+click adds one, and typing then happens at every caret at once.
@@ -173,6 +174,7 @@ private:
     QTextCursor m_zoom, m_pin; // cursors, so they follow the lines as text is edited
     double m_fontSize = 10, m_sidebarWidth = 240;
     QSet<QString> m_collapsedTags;
+    QSet<QString> m_collapsedProjects; // sidebar folds, by path (Parent/Child)
     QMap<QString, int> m_tagCounts; // every tag in the document, for autofill
     void suggestTag(int position);
     QList<QTextCursor> m_extras;

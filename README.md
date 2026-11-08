@@ -71,14 +71,15 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+= / Ctrl+- / Ctrl+0 (or Ctrl+scroll) | Bigger / smaller / reset text to Omarchy's size |
 | Ctrl+N | New window with a blank, untitled document (the first Ctrl+S asks where to save it) |
 | Ctrl+O / Ctrl+S / Ctrl+Shift+S | Open / Save now / Save As |
-| Ctrl+L | Go to project: type to filter, Enter zooms into it |
+| Ctrl+Shift+L | Go to project: type to filter, Enter zooms into it |
+| Ctrl+L / Ctrl+R | Fold / unfold the selected sidebar item: a project with projects inside it, or a tag with values (only while the sidebar is showing) |
 | Ctrl+P | Print what is on screen to the default printer |
 | Ctrl+/ (or F1) | Show all keys. Type to filter them, Down and Enter to run one, Esc to close |
 | Ctrl+W / Ctrl+Q | Close the window / quit |
 
 Typing `@` and a letter offers a tag that is already in the document (`@M` suggests `@MIT`): Tab, Right, or Enter accepts it, and typing on replaces it.
 
-Ctrl+click adds more carets, and typing, Backspace, Delete, arrows, Enter and Tab then act at all of them (Esc or a plain click goes back to one). Triple-click selects a line; dragging from the third click extends by whole lines. Drag the edge of the sidebar to resize it, or drag it nearly shut to collapse it.
+Ctrl+click adds more carets, and typing, Backspace, Delete, arrows, Enter and Tab then act at all of them (Esc or a plain click goes back to one). Triple-click selects a line; dragging from the third click extends by whole lines. A project with projects inside it has a fold arrow in the sidebar, as tags with values do (remembered per file). Drag the edge of the sidebar to resize it, or drag it nearly shut to collapse it.
 
 Every key is Ctrl+key or Ctrl+Shift+key (TaskPaper's where known). Reopening a file puts the cursor back where you left it and restores which items were folded, which tags are collapsed in the sidebar, and whether the sidebar is open.
 

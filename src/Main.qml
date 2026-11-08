@@ -34,7 +34,7 @@ ApplicationWindow {
     property int moveEnd: 0
     property int moveCaret: 0
     property var moveItems: []
-    // The same list serves "Go to project" (Ctrl+L), which zooms into the project as clicking it in the sidebar would.
+    // The same list serves "Go to project" (Ctrl+Shift+L), which zooms into the project as clicking it in the sidebar would.
     property bool moveJump: false
     // Every typed word has to appear somewhere in the name.
     property var moveShown: moveItems.filter(item => moveField.text.toLowerCase().split(" ").every(word => item.label.toLowerCase().indexOf(word) >= 0))
@@ -94,6 +94,37 @@ ApplicationWindow {
                 return
             }
         }
+    }
+    // Ctrl+L / Ctrl+R fold and unfold the selected sidebar item (a project with projects in it, or a tag with values).
+    // Collapsing a selected project that has nothing nested in it folds its parent and selects that instead.
+    function toggleSidebarFold(row) {
+        if (row.kind === "tag") backend.toggleTagFold(row.name)
+        else backend.toggleProjectFold(row.path)
+    }
+    function foldSidebar(collapse) {
+        if (!win.sidebarVisible)
+            return
+        const rows = backend.sidebar
+        let found = false
+        for (const row of rows) {
+            if (row.foldable !== true || !sidebarCurrent(row))
+                continue
+            found = true
+            if (row.collapsed !== collapse)
+                toggleSidebarFold(row)
+        }
+        if (found || !collapse)
+            return
+        const at = rows.findIndex(r => r.kind === "project" && sidebarCurrent(r))
+        if (at < 0 || !(rows[at].level > 0))
+            return
+        for (let i = at - 1; i >= 0; --i)
+            if (rows[i].kind === "project" && (rows[i].level || 0) < rows[at].level) {
+                if (!rows[i].collapsed)
+                    toggleSidebarFold(rows[i])
+                backend.showProject(rows[i].block)
+                return
+            }
     }
     function stepSidebar(direction) {
         if (!win.sidebarVisible)
@@ -255,7 +286,9 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
     Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; onActivated: backend.newWindow() }
-    Shortcut { sequence: "Ctrl+L"; context: Qt.ApplicationShortcut; onActivated: win.openJump() }
+    Shortcut { sequence: "Ctrl+Shift+L"; context: Qt.ApplicationShortcut; onActivated: win.openJump() }
+    Shortcut { sequence: "Ctrl+L"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.foldSidebar(true) }
+    Shortcut { sequence: "Ctrl+R"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.foldSidebar(false) }
     Shortcut { sequence: "F1"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+P"; context: Qt.ApplicationShortcut; onActivated: backend.print() }
     Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveNow() }
@@ -389,10 +422,10 @@ ApplicationWindow {
                             font.strikeout: row.termState === 2
                             color: row.header || row.termState === 2 ? theme.muted : theme.foreground
                         }
-                        // Tags that have values fold, with the same arrow as the editor.
+                        // Tags that have values, and projects that have projects inside them, fold, with the same arrow as the editor.
                         Text {
                             visible: row.modelData.foldable === true
-                            x: 4
+                            x: row.modelData.kind === "tag" ? 4 : (row.modelData.level || 0) * 14 - 6
                             width: 24
                             height: parent.height
                             horizontalAlignment: Text.AlignHCenter
@@ -401,7 +434,7 @@ ApplicationWindow {
                             font.pointSize: win.fs + 6
                             color: row.modelData.collapsed ? theme.accent : theme.muted
                             HoverHandler { cursorShape: Qt.PointingHandCursor }
-                            TapHandler { onTapped: backend.toggleTagFold(row.modelData.name) }
+                            TapHandler { onTapped: row.modelData.kind === "tag" ? backend.toggleTagFold(row.modelData.name) : backend.toggleProjectFold(row.modelData.path) }
                         }
                         HoverHandler { id: hover }
                         // Ctrl+click adds a tag (or one of its values) to the search; Ctrl+Shift+click filters it out.
@@ -1209,7 +1242,9 @@ ApplicationWindow {
                 [qsTr("Reset text size"), "Ctrl+0", () => backend.changeFontSize(0)],
                 [qsTr("Open"), "Ctrl+O", () => backend.openDialog()],
                 [qsTr("New window"), "Ctrl+N", () => backend.newWindow()],
-                [qsTr("Go to project"), "Ctrl+L", () => win.openJump()],
+                [qsTr("Go to project"), "Ctrl+Shift+L", () => win.openJump()],
+                [qsTr("Fold the selected sidebar item"), "Ctrl+L", () => win.foldSidebar(true)],
+                [qsTr("Unfold the selected sidebar item"), "Ctrl+R", () => win.foldSidebar(false)],
                 [qsTr("Save"), "Ctrl+S", () => backend.saveNow()],
                 [qsTr("Save As"), "Ctrl+Shift+S", () => backend.saveAsDialog()],
                 [qsTr("Print"), "Ctrl+P", () => backend.print()],
