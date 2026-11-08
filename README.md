@@ -10,8 +10,8 @@ A plain-text task outliner for Omarchy, in the style of [TaskPaper](https://www.
 On Omarchy or any Arch-based system, build it from source (needs `qt6-base`, `qt6-declarative`, `qt6-wayland` and `xdg-desktop-portal`):
 
 ```
-git clone https://github.com/helloindustry/omapaper
-cd omapaper
+git clone https://github.com/helloindustry/taskpaper
+cd taskpaper
 bin/install
 ```
 
