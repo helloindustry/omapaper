@@ -71,8 +71,8 @@ Saved searches live in the file under a `Searches:` project as `@search(query)`.
 | Ctrl+= / Ctrl+- / Ctrl+0 (or Ctrl+scroll) | Bigger / smaller / reset text to Omarchy's size |
 | Ctrl+N | New window with a blank, untitled document (the first Ctrl+S asks where to save it) |
 | Ctrl+O / Ctrl+S / Ctrl+Shift+S | Open / Save now / Save As |
-| Ctrl+Shift+L | Go to project: type to filter, Enter zooms into it |
-| Ctrl+L / Ctrl+R | Fold / unfold the selected sidebar item: a project with projects inside it, or a tag with values (only while the sidebar is showing) |
+| Ctrl+L | Go to project: type to filter, Enter zooms into it |
+| Ctrl+Left / Ctrl+Right | Fold / unfold the item at the caret, like Ctrl+, and Ctrl+. (so they no longer move by word). Right after Ctrl+Up/Down or a click in the sidebar they fold or unfold the sidebar's selected item instead (a project with projects inside it, or a tag with values), until you click or type in the editor |
 | Ctrl+P | Print what is on screen to the default printer |
 | Ctrl+/ (or F1) | Show all keys. Type to filter them, Down and Enter to run one, Esc to close |
 | Ctrl+W / Ctrl+Q | Close the window / quit |

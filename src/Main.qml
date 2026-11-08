@@ -26,6 +26,13 @@ ApplicationWindow {
     property bool sidebarVisible: backend.sidebarShown() // remembered between runs
     onSidebarVisibleChanged: backend.setSidebarShown(sidebarVisible)
     property bool helpVisible: false
+    // While the sidebar is stepped through with the keys, a row the pointer happens to rest on is not highlighted;
+    // moving the pointer brings the hover back.
+    property bool sidebarKeyNav: false
+    // Ctrl+Left / Ctrl+Right fold the item at the caret. Right after the sidebar has been used (Ctrl+Up/Down, or a click
+    // on a row) they fold its selected item instead, until the editor is clicked or typed in.
+    property bool sidebarMode: false
+    property point sidebarPointer: Qt.point(-1, -1)
     property int deleteBlock: -1 // a saved search waiting on y/n
     property string deleteName: ""
     // The "move to project" list: what was selected when it opened, and the projects it can go to.
@@ -34,7 +41,7 @@ ApplicationWindow {
     property int moveEnd: 0
     property int moveCaret: 0
     property var moveItems: []
-    // The same list serves "Go to project" (Ctrl+Shift+L), which zooms into the project as clicking it in the sidebar would.
+    // The same list serves "Go to project" (Ctrl+L), which zooms into the project as clicking it in the sidebar would.
     property bool moveJump: false
     // Every typed word has to appear somewhere in the name.
     property var moveShown: moveItems.filter(item => moveField.text.toLowerCase().split(" ").every(word => item.label.toLowerCase().indexOf(word) >= 0))
@@ -95,7 +102,7 @@ ApplicationWindow {
             }
         }
     }
-    // Ctrl+L / Ctrl+R fold and unfold the selected sidebar item (a project with projects in it, or a tag with values).
+    // Ctrl+Left / Ctrl+Right fold and unfold the selected sidebar item (a project with projects in it, or a tag with values).
     // Collapsing a selected project that has nothing nested in it folds its parent and selects that instead.
     function toggleSidebarFold(row) {
         if (row.kind === "tag") backend.toggleTagFold(row.name)
@@ -129,6 +136,8 @@ ApplicationWindow {
     function stepSidebar(direction) {
         if (!win.sidebarVisible)
             return
+        win.sidebarKeyNav = true
+        win.sidebarMode = true
         const rows = backend.sidebar
         let at = -1
         for (let i = 0; i < rows.length && at < 0; ++i)
@@ -286,9 +295,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+/"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+O"; context: Qt.ApplicationShortcut; onActivated: backend.openDialog() }
     Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; onActivated: backend.newWindow() }
-    Shortcut { sequence: "Ctrl+Shift+L"; context: Qt.ApplicationShortcut; onActivated: win.openJump() }
-    Shortcut { sequence: "Ctrl+L"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.foldSidebar(true) }
-    Shortcut { sequence: "Ctrl+R"; context: Qt.ApplicationShortcut; enabled: win.sidebarVisible; onActivated: win.foldSidebar(false) }
+    Shortcut { sequence: "Ctrl+L"; context: Qt.ApplicationShortcut; onActivated: win.openJump() }
     Shortcut { sequence: "F1"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Ctrl+P"; context: Qt.ApplicationShortcut; onActivated: backend.print() }
     Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; onActivated: backend.saveNow() }
@@ -382,6 +389,11 @@ ApplicationWindow {
                                     return
                                 }
                         }
+                        if (event.modifiers === Qt.ControlModifier && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
+                            win.foldSidebar(event.key === Qt.Key_Left)
+                            event.accepted = true
+                            return
+                        }
                         // Anything else is for the editor: hand focus back and pass typed text along.
                         editor.forceActiveFocus()
                         if (event.text.length > 0 && event.text.charCodeAt(0) >= 32 && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier)))
@@ -407,12 +419,12 @@ ApplicationWindow {
                             anchors.leftMargin: 6
                             anchors.rightMargin: 6
                             radius: Math.min(4, theme.radius)
-                            color: row.current ? theme.selection : hover.hovered && !row.header ? Qt.alpha(theme.selection, 0.5) : "transparent"
+                            color: row.current ? theme.selection : hover.hovered && !row.header && !win.sidebarKeyNav ? Qt.alpha(theme.selection, 0.5) : "transparent"
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.verticalCenterOffset: row.header ? 6 : 0
-                            x: (row.modelData.kind === "tag" ? 28 : 16) + (row.modelData.level || 0) * 14
+                            x: (row.modelData.kind === "tag" || row.modelData.kind === "project" ? 28 : 16) + (row.modelData.level || 0) * 14
                             width: parent.width - x - 16
                             text: row.modelData.label
                             elide: Text.ElideRight
@@ -425,7 +437,7 @@ ApplicationWindow {
                         // Tags that have values, and projects that have projects inside them, fold, with the same arrow as the editor.
                         Text {
                             visible: row.modelData.foldable === true
-                            x: row.modelData.kind === "tag" ? 4 : (row.modelData.level || 0) * 14 - 6
+                            x: row.modelData.kind === "tag" ? 4 : 4 + (row.modelData.level || 0) * 14
                             width: 24
                             height: parent.height
                             horizontalAlignment: Text.AlignHCenter
@@ -436,7 +448,17 @@ ApplicationWindow {
                             HoverHandler { cursorShape: Qt.PointingHandCursor }
                             TapHandler { onTapped: row.modelData.kind === "tag" ? backend.toggleTagFold(row.modelData.name) : backend.toggleProjectFold(row.modelData.path) }
                         }
-                        HoverHandler { id: hover }
+                        HoverHandler {
+                            id: hover
+                            onPointChanged: {
+                                // A list scrolling under a resting pointer doesn't count as the pointer moving.
+                                const p = point.scenePosition
+                                if (p.x !== win.sidebarPointer.x || p.y !== win.sidebarPointer.y) {
+                                    win.sidebarPointer = p
+                                    win.sidebarKeyNav = false
+                                }
+                            }
+                        }
                         // Ctrl+click adds a tag (or one of its values) to the search; Ctrl+Shift+click filters it out.
                         TapHandler {
                             acceptedButtons: Qt.LeftButton
@@ -455,6 +477,7 @@ ApplicationWindow {
                             acceptedModifiers: Qt.NoModifier
                             enabled: !row.header
                             onTapped: {
+                                win.sidebarMode = true
                                 if (row.modelData.kind === "all") backend.showAll()
                                 else if (row.modelData.kind === "project") backend.showProject(row.modelData.block)
                                 else { backend.search(row.modelData.query); if (row.modelData.kind === "search") list.forceActiveFocus() }
@@ -673,6 +696,7 @@ ApplicationWindow {
                         TapHandler {
                             acceptedModifiers: Qt.NoModifier
                             onTapped: eventPoint => {
+                                win.sidebarMode = false
                                 const end = backend.endOfVisible()
                                 const last = editor.positionToRectangle(end)
                                 // Qt finishes its own handling of the click after this, so the caret is set once that is done.
@@ -728,6 +752,16 @@ ApplicationWindow {
                             if (win.sidebarVisible && event.modifiers === Qt.ControlModifier && (event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
                                 win.stepSidebar(event.key === Qt.Key_Up ? -1 : 1); event.accepted = true; return
                             }
+                            if (event.modifiers === Qt.ControlModifier && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
+                                const collapse = event.key === Qt.Key_Left
+                                if (win.sidebarVisible && win.sidebarMode) win.foldSidebar(collapse)
+                                else backend.foldItems(editor.selectionStart, editor.selectionEnd, collapse, false)
+                                event.accepted = true; return
+                            }
+                            // Typing or moving in the editor ends "sidebar mode" (modifier keys on their own and the sidebar keys don't).
+                            if ([Qt.Key_Control, Qt.Key_Shift, Qt.Key_Alt, Qt.Key_Meta, Qt.Key_AltGr].indexOf(event.key) < 0
+                                    && !(event.modifiers === Qt.ControlModifier && [Qt.Key_Up, Qt.Key_Down].indexOf(event.key) >= 0))
+                                win.sidebarMode = false
                             // Cut and copy: whole lines take their children with them.
                             if ((event.key === Qt.Key_X && event.modifiers === Qt.ControlModifier || event.key === Qt.Key_Delete && event.modifiers === Qt.ShiftModifier)
                                     && backend.cutItems(editor.selectionStart, editor.selectionEnd)) { event.accepted = true; return }
@@ -1242,9 +1276,9 @@ ApplicationWindow {
                 [qsTr("Reset text size"), "Ctrl+0", () => backend.changeFontSize(0)],
                 [qsTr("Open"), "Ctrl+O", () => backend.openDialog()],
                 [qsTr("New window"), "Ctrl+N", () => backend.newWindow()],
-                [qsTr("Go to project"), "Ctrl+Shift+L", () => win.openJump()],
-                [qsTr("Fold the selected sidebar item"), "Ctrl+L", () => win.foldSidebar(true)],
-                [qsTr("Unfold the selected sidebar item"), "Ctrl+R", () => win.foldSidebar(false)],
+                [qsTr("Go to project"), "Ctrl+L", () => win.openJump()],
+                [qsTr("Fold the item (or the sidebar item just used)"), "Ctrl+Left", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, true, false)],
+                [qsTr("Unfold the item (or the sidebar item just used)"), "Ctrl+Right", () => backend.foldItems(editor.selectionStart, editor.selectionEnd, false, false)],
                 [qsTr("Save"), "Ctrl+S", () => backend.saveNow()],
                 [qsTr("Save As"), "Ctrl+Shift+S", () => backend.saveAsDialog()],
                 [qsTr("Print"), "Ctrl+P", () => backend.print()],
